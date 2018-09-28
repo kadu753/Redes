@@ -18,12 +18,12 @@ int main(int argc, char *argv[]){
 		die("Não existe um roteador com este [ID]");
 
 	infoRoteador.qtdMsg = infoRoteador.qtdNova = 0;
-	infoRoteador.tamMsg = (int)sizeof(socketRoteador);
+	infoRoteador.tamMsg = (int)sizeof(si_other);
 
-	memset((char *) &socketRoteador, 0, sizeof(socketRoteador));
+	//memset((char *) &socketRoteador, 0, sizeof(socketRoteador));
 
 	pegarEnlace(infoRoteador.id, tabelaRoteamento);
-	configurarRoteadores(infoRoteador.id, &infoRoteador.sock, &socketRoteador, roteadores);
+	configurarRoteadores(infoRoteador.id, &infoRoteador.sock, &si_me, roteadores);
 
 	pthread_create(&receberID, NULL, receber, &infoRoteador);
 
@@ -31,24 +31,24 @@ int main(int argc, char *argv[]){
 		system("clear");
 		switch(opcoes){
 			case -1:
+				menu(roteadores[infoRoteador.id].id, roteadores[infoRoteador.id].porta, roteadores[infoRoteador.id].ip, infoRoteador.qtdNova);
 				while(scanf("%d", &opcoes) != 1)
 					getchar();
 				break;
 			case 1:
 				enviarMensagem(auxEnviar, infoRoteador.id, infoRoteador.sock, infoRoteador.tamMsg);
+				break;
 			case 2:
 				infoRoteador.qtdNova = 0;
-				if(!infoRoteador.qtdMsg){
-					printf("Você não possui mensagens\n");
-					opcoes = -1;
-				}else{
-					for(int i = 0; i < infoRoteador.qtdMsg; i++)
-						printf("Destinatario [%c]: %s\n", caixaMensagens[i].origem + ASCII, caixaMensagens[i].mensagem);
-					printf("Enter para voltar\n");
-					getchar();
-					getchar();
-					opcoes = -1;
-				}
+				printarCaixaEntrada(infoRoteador.qtdMsg, caixaMensagens);
+				opcoes = -1;
+				break;
+			case 3:
+				printRoteamento(infoRoteador.id, tabelaRoteamento);
+				opcoes = -1;
+				break;
+			case 4:
+				opcoes = -1;
 				break;
 			case 0:
 				exit(1);
@@ -88,20 +88,20 @@ void enviarMensagem(pacotes auxEnviar, int idRoteador, int sockRoteador, int tam
 void transmitirPacote(pacotes auxEnviar, int sockRoteador, int tamMsg){
 	int auxDestino = 0;
 	auxDestino = tabelaRoteamento[auxEnviar.destino].salto;
-	socketRoteador.sin_port = htons(roteadores[auxDestino].porta);
-	if(inet_aton(roteadores[auxDestino].ip, &socketRoteador.sin_addr) == 0){
+	si_other.sin_port = htons(roteadores[auxDestino].porta);
+	if(inet_aton(roteadores[auxDestino].ip, &si_other.sin_addr) == 0){
 		printf("Não foi possível obter o endereco do destinatario.\n");
 	}else{
-		if(sendto(sockRoteador, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &socketRoteador, tamMsg) == -1){
+		if(sendto(sockRoteador, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &si_other, tamMsg) == -1){
 			printf("Falha no envio do pacote\n");
 		}else{
 			printf("Pacote enviado\n");
 			strcpy(LOG, "Pacote enviado para #");
 			char aux[1];
-			aux[0] = auxEnviar.destino + ASCII;
+			aux[0] = auxEnviar.destino;
 			strcat(LOG, aux);
 			strcat(LOG, " através de #");
-			aux[0] = tabelaRoteamento[auxEnviar.destino].salto + ASCII;
+			aux[0] = tabelaRoteamento[auxEnviar.destino].salto;
 			strcat(LOG, aux);
 		}
 		sleep(10);
@@ -113,7 +113,7 @@ void *receber(void *info){
 	pacotes auxReceber;
 	char aux[1];
 	while(1){
-		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &socketRoteador, (uint*)&infoRoteador->tamMsg) == -1){
+		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &si_other, (uint*)&infoRoteador->tamMsg) == -1){
 			printf("Falha no recebimento do pacote\n");
 		}else{
 			if(auxReceber.destino == infoRoteador->id){
@@ -121,7 +121,7 @@ void *receber(void *info){
 				caixaMensagens[infoRoteador->qtdMsg++] = auxReceber;
 				infoRoteador->qtdNova++;
 				strcpy(LOG, "Recebido um pacote do roteador ");
-				aux[0] = auxReceber.origem + ASCII;
+				aux[0] = auxReceber.origem;
 				strcat(LOG, aux);
 			}else{
 				transmitirPacote(auxReceber, infoRoteador->sock, infoRoteador->tamMsg);

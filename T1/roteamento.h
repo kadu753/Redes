@@ -12,7 +12,6 @@
 #define START 0
 #define INF 12345678
 #define MSG 100
-#define ASCII 65
 #define TAMCAIXA 10
 
 char LOG[100];
@@ -21,7 +20,8 @@ typedef struct{
 	int salto, distancia;
 }pair;
 
-struct sockaddr_in socketRoteador;
+struct sockaddr_in si_me;
+struct sockaddr_in si_other;
 
 pthread_t receberID;							// Thread que recebe mensagens
 
@@ -54,3 +54,5 @@ int toInt(char *str);
 void *receber(void *info);
 void enviarMensagem(pacotes auxEnviar, int idRoteador, int sockRoteador, int tamMsg);
 void transmitirPacote(pacotes auxEnviar, int sockRoteador, int tamMsg);
+void menu(int id, int porta, char ip[], int novas);
+void printarCaixaEntrada(int qtdMsg, pacotes caixaMensagens[]);
