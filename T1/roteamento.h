@@ -20,8 +20,8 @@ typedef struct{
 	int salto, distancia;
 }pair;
 
-struct sockaddr_in si_me;
 struct sockaddr_in si_other;
+struct sockaddr_in si_me;
 
 pthread_t receberID;							// Thread que recebe mensagens
 
@@ -49,7 +49,7 @@ void pegarEnlace(int id, pair tabelaRoteamento[]);
 void djikstra(int id, pair tabelaRoteamento[], int matriz[][NROUT]);
 void printRoteamento(int id, pair tabelaRoteamento[]);
 int backtracking(int inicial, int atual, int caminho[]);
-void configurarRoteadores(int id, int *sock, struct sockaddr_in *socketRoteador,roteador roteadores[]);
+void configurarRoteadores(int id, roteador roteadores[]);
 int toInt(char *str);
 void *receber(void *info);
 void enviarMensagem(pacotes auxEnviar, int idRoteador, int sockRoteador, int tamMsg);

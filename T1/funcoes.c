@@ -48,25 +48,11 @@ void djikstra(int id, pair tabelaRoteamento[], int matriz[][NROUT]){
 	}
 }
 
-void configurarRoteadores(int id, int *sock, struct sockaddr_in *si_me, roteador roteadores[]){
+void configurarRoteadores(int id, roteador roteadores[]){
 	FILE *arquivo = fopen("roteador.config", "r");
 	if(!arquivo) die("Não foi possível abrir o arquivo de roteadores\n");
 	for(int i = 0; fscanf(arquivo, "%d %d %s\n", &roteadores[i].id, &roteadores[i].porta, roteadores[i].ip) != EOF; i++);
 	fclose(arquivo);
-
-	//Criação do socket
-	if((*sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
-		die("Não foi possível criar o Socket!");
-	}else{
-		memset((char*) si_me, 0, sizeof(si_me));
-		si_me->sin_family = AF_INET;
-		si_me->sin_port = htons(roteadores[id].porta);		//Atribuir porta
-		si_me->sin_addr.s_addr = htonl(INADDR_ANY);		//Atribui o socket
-	}
-
-	//Liga o socket a porta
-	if(bind(*sock, (struct sockaddr*) si_me, sizeof(*si_me)) == -1)
-		die("Não foi possível conectar o socket com a porta\n");
 }
 
 int backtracking(int inicial, int atual, int caminho[]){
@@ -100,7 +86,7 @@ void printRoteamento(int id, pair tabelaRoteamento[]){
 		printf("|%8d       |%7d      |%7d     |\n", i, tabelaRoteamento[i].salto, tabelaRoteamento[i].distancia);
 	}
 	printf("|------------------------------------------|\n");
-	printf("Enter para voltar\n");
+	printf("Enter para voltar\n\n");
 	getchar();
 	getchar();
 }
@@ -110,12 +96,14 @@ void menu(int id, int porta, char ip[], int novas){
 	printf(" ____________________________________________________________\n");
 	printf("|%s%d%17s%d%17s%s |\n", "Roteador: ", id, "Porta: ", porta, "IP: ", ip);
 	printf("|--------------------%d Mensagens Novas-----------------------|\n", novas);
+	printf(" LOG: %s\n", LOG);
+	printf("|------------------------------------------------------------|\n");
 	printf("|%-60s|\n", "1 - Mandar mensagem");
 	printf("|%-60s|\n", "2 - Ler Mensagens");
 	printf("|%-60s|\n", "3 - Tabela de Roteamento");
 	printf("|%-60s|\n", "4 - Atualizar");
 	printf("|%-60s|\n", "0 - Sair");
-	printf("|------------------------------------------------------------|\n");
+	printf("|____________________________________________________________|\n\n");
 }
 
 void printarCaixaEntrada(int qtdMsg, pacotes caixaMensagens[]){
@@ -130,7 +118,7 @@ void printarCaixaEntrada(int qtdMsg, pacotes caixaMensagens[]){
 			printf(" Origem [%d]: %s\n", caixaMensagens[i].origem, caixaMensagens[i].mensagem);
 	}
 	printf("|------------------------------------------------------------|\n");
-	printf("Enter para voltar\n");
+	printf("Enter para voltar\n\n");
 	getchar();
 	getchar();
 }

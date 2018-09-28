@@ -18,12 +18,18 @@ int main(int argc, char *argv[]){
 		die("Não existe um roteador com este [ID]");
 
 	infoRoteador.qtdMsg = infoRoteador.qtdNova = 0;
-	infoRoteador.tamMsg = (int)sizeof(si_other);
-
-	//memset((char *) &socketRoteador, 0, sizeof(socketRoteador));
+	infoRoteador.tamMsg = (int)sizeof(struct sockaddr_in);
 
 	pegarEnlace(infoRoteador.id, tabelaRoteamento);
-	configurarRoteadores(infoRoteador.id, &infoRoteador.sock, &si_me, roteadores);
+	configurarRoteadores(infoRoteador.id, roteadores);
+	
+	if((infoRoteador.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
+		die("Não foi possível criar o Socket!");
+	}
+	memset((char*) &si_other, 0, sizeof(si_other));
+	si_me.sin_family = AF_INET;
+	si_me.sin_port = htons(roteadores[infoRoteador.id].porta);
+	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	pthread_create(&receberID, NULL, receber, &infoRoteador);
 
@@ -37,6 +43,7 @@ int main(int argc, char *argv[]){
 				break;
 			case 1:
 				enviarMensagem(auxEnviar, infoRoteador.id, infoRoteador.sock, infoRoteador.tamMsg);
+				opcoes = -1;
 				break;
 			case 2:
 				infoRoteador.qtdNova = 0;
@@ -55,7 +62,7 @@ int main(int argc, char *argv[]){
 				break;
 			default:
 				system("clear");
-				printf("Not possible\n");
+				printf("Essa opção não existe\nRetornando para o menu\n");
 				sleep(2);
 				opcoes = -1;
 				break;
@@ -64,47 +71,55 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 
-void enviarMensagem(pacotes auxEnviar, int idRoteador, int sockRoteador, int tamMsg){
-	printf("Insira o roteador alvo\n");
-	while(scanf("%d", &auxEnviar.destino) != 1 && (auxEnviar.destino < 0 || auxEnviar.destino >= NROUT))
-		printf("Roteador inexistente\n");
+void enviarMensagem(pacotes auxEnviar, int idRoteador, int auxSock, int tamMsg){
+	printf("Insira o roteador destino\n");
+	while(scanf("%d", &auxEnviar.destino) != 1)			//Somente aceita um número inteiro
 		getchar();
-	while(1){
 		system("clear");
-		printf("Insira uma mensagem com no máximo %d caracteres\n", MSG);
-		scanf("%[^\n]", auxEnviar.mensagem);
-		if(strlen(auxEnviar.mensagem) <= MSG){
-			auxEnviar.origem = idRoteador;
-			transmitirPacote(auxEnviar, sockRoteador, tamMsg);
+		printf("Insira o roteador destino\n");
+	while(1){
+		getchar();
+		if(auxEnviar.destino < 0 || auxEnviar.destino >= NROUT){
+			printf("Roteador inexistente\n");
 		}else{
-			printf("Mensagem estourou o limite de caracteres\n");
-			sleep(3);
 			system("clear");
+			printf("Insira uma mensagem com no máximo %d caracteres\n", MSG);
+			scanf("%[^\n]", auxEnviar.mensagem);
+			if(strlen(auxEnviar.mensagem) <= MSG){
+				auxEnviar.origem = idRoteador;
+				transmitirPacote(auxEnviar, auxSock, tamMsg);
+				break;
+			}else{
+				printf("Mensagem estourou o limite de caracteres\n");
+				sleep(2);
+				system("clear");
+			}
 		}
-		break;
 	}
 }
 
-void transmitirPacote(pacotes auxEnviar, int sockRoteador, int tamMsg){
+void transmitirPacote(pacotes auxEnviar, int auxSock, int tamMsg){
 	int auxDestino = 0;
 	auxDestino = tabelaRoteamento[auxEnviar.destino].salto;
 	si_other.sin_port = htons(roteadores[auxDestino].porta);
 	if(inet_aton(roteadores[auxDestino].ip, &si_other.sin_addr) == 0){
 		printf("Não foi possível obter o endereco do destinatario.\n");
 	}else{
-		if(sendto(sockRoteador, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &si_other, tamMsg) == -1){
+		if(sendto(auxSock, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &si_other, tamMsg) == -1){
 			printf("Falha no envio do pacote\n");
 		}else{
-			printf("Pacote enviado\n");
 			strcpy(LOG, "Pacote enviado para #");
-			char aux[1];
-			aux[0] = auxEnviar.destino;
+			char aux[2];
+			aux[1] = 0;
+			aux[0] = auxEnviar.destino + '0';
 			strcat(LOG, aux);
 			strcat(LOG, " através de #");
-			aux[0] = tabelaRoteamento[auxEnviar.destino].salto;
+			aux[0] = tabelaRoteamento[auxEnviar.destino].salto + '0';
 			strcat(LOG, aux);
+			printf("%s\n", LOG);
 		}
-		sleep(10);
+		printf("\nRetornando ao menu em 2 segundos\n");
+		sleep(2);
 	}
 }
 
@@ -112,16 +127,27 @@ void *receber(void *info){
 	tipo *infoRoteador = (tipo*)info;
 	pacotes auxReceber;
 	char aux[1];
+
+	if((infoRoteador->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
+		die("Não foi possível criar o Socket!");
+	}
+	memset((char*) &si_me, 0, sizeof(si_me));
+	si_me.sin_family = AF_INET;
+	si_me.sin_port = htons(roteadores[infoRoteador->id].porta);
+	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	if(bind(infoRoteador->sock, (struct sockaddr*) &si_me, sizeof(si_me)) == -1)
+		die("Não foi possível conectar o socket com a porta\n");
+
 	while(1){
-		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &si_other, (uint*)&infoRoteador->tamMsg) == -1){
+		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &si_me, (uint*)&infoRoteador->tamMsg) == -1){
 			printf("Falha no recebimento do pacote\n");
 		}else{
 			if(auxReceber.destino == infoRoteador->id){
-				printf("LUL\n");
 				caixaMensagens[infoRoteador->qtdMsg++] = auxReceber;
 				infoRoteador->qtdNova++;
 				strcpy(LOG, "Recebido um pacote do roteador ");
-				aux[0] = auxReceber.origem;
+				aux[0] = auxReceber.origem + '0';
 				strcat(LOG, aux);
 			}else{
 				transmitirPacote(auxReceber, infoRoteador->sock, infoRoteador->tamMsg);
