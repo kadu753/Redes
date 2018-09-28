@@ -8,8 +8,8 @@
 #include <sys/types.h>
 #include <pthread.h>
 
-#define NROUT 7
-#define START 0
+#define NROUT 6
+#define START 1
 #define INF 12345678
 #define MSG 100
 #define TAMCAIXA 10
@@ -20,8 +20,7 @@ typedef struct{
 	int salto, distancia;
 }pair;
 
-struct sockaddr_in si_other;
-struct sockaddr_in si_me;
+struct sockaddr_in socketRoteador;
 
 pthread_t receberID;							// Thread que recebe mensagens
 

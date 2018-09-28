@@ -26,10 +26,10 @@ int main(int argc, char *argv[]){
 	if((infoRoteador.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
 		die("Não foi possível criar o Socket!");
 	}
-	memset((char*) &si_other, 0, sizeof(si_other));
-	si_me.sin_family = AF_INET;
-	si_me.sin_port = htons(roteadores[infoRoteador.id].porta);
-	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+	memset((char*) &socketRoteador, 0, sizeof(socketRoteador));
+	socketRoteador.sin_family = AF_INET;
+	socketRoteador.sin_port = htons(roteadores[infoRoteador.id].porta);
+	socketRoteador.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	pthread_create(&receberID, NULL, receber, &infoRoteador);
 
@@ -101,11 +101,11 @@ void enviarMensagem(pacotes auxEnviar, int idRoteador, int auxSock, int tamMsg){
 void transmitirPacote(pacotes auxEnviar, int auxSock, int tamMsg){
 	int auxDestino = 0;
 	auxDestino = tabelaRoteamento[auxEnviar.destino].salto;
-	si_other.sin_port = htons(roteadores[auxDestino].porta);
-	if(inet_aton(roteadores[auxDestino].ip, &si_other.sin_addr) == 0){
+	socketRoteador.sin_port = htons(roteadores[auxDestino].porta);
+	if(inet_aton(roteadores[auxDestino].ip, &socketRoteador.sin_addr) == 0){
 		printf("Não foi possível obter o endereco do destinatario.\n");
 	}else{
-		if(sendto(auxSock, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &si_other, tamMsg) == -1){
+		if(sendto(auxSock, &auxEnviar, sizeof(auxEnviar), 0, (struct sockaddr*) &socketRoteador, tamMsg) == -1){
 			printf("Falha no envio do pacote\n");
 		}else{
 			strcpy(LOG, "Pacote enviado para #");
@@ -116,10 +116,7 @@ void transmitirPacote(pacotes auxEnviar, int auxSock, int tamMsg){
 			strcat(LOG, " através de #");
 			aux[0] = tabelaRoteamento[auxEnviar.destino].salto + '0';
 			strcat(LOG, aux);
-			printf("%s\n", LOG);
 		}
-		printf("\nRetornando ao menu em 2 segundos\n");
-		sleep(2);
 	}
 }
 
@@ -131,16 +128,16 @@ void *receber(void *info){
 	if((infoRoteador->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
 		die("Não foi possível criar o Socket!");
 	}
-	memset((char*) &si_me, 0, sizeof(si_me));
-	si_me.sin_family = AF_INET;
-	si_me.sin_port = htons(roteadores[infoRoteador->id].porta);
-	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+	memset((char*) &socketRoteador, 0, sizeof(socketRoteador));
+	socketRoteador.sin_family = AF_INET;
+	socketRoteador.sin_port = htons(roteadores[infoRoteador->id].porta);
+	socketRoteador.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	if(bind(infoRoteador->sock, (struct sockaddr*) &si_me, sizeof(si_me)) == -1)
+	if(bind(infoRoteador->sock, (struct sockaddr*) &socketRoteador, sizeof(socketRoteador)) == -1)
 		die("Não foi possível conectar o socket com a porta\n");
 
 	while(1){
-		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &si_me, (uint*)&infoRoteador->tamMsg) == -1){
+		if(recvfrom(infoRoteador->sock, &auxReceber, sizeof(auxReceber), 0, (struct sockaddr*) &socketRoteador, (uint*)&infoRoteador->tamMsg) == -1){
 			printf("Falha no recebimento do pacote\n");
 		}else{
 			if(auxReceber.destino == infoRoteador->id){
@@ -152,6 +149,7 @@ void *receber(void *info){
 			}else{
 				transmitirPacote(auxReceber, infoRoteador->sock, infoRoteador->tamMsg);
 			}
+			menu(roteadores[infoRoteador->id].id, roteadores[infoRoteador->id].porta, roteadores[infoRoteador->id].ip, infoRoteador->qtdNova);
 		}
 	}
 }

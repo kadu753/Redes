@@ -7,7 +7,7 @@ void pegarEnlace(int id, pair tabelaRoteamento[]){
 	FILE *arquivo = fopen("enlaces.config", "r");
 	if(!arquivo) die("Não foi possível abrir o arquivo de enlaces\n");
 	while(fscanf(arquivo, "%d %d %d\n", &r1, &r2, &dist) != EOF)
-		matriz[r1-START][r2-START] = matriz[r2-START][r1-START] = dist; //Arestas são bidirencionais
+		matriz[r1][r2] = matriz[r2][r1] = dist; //Arestas são bidirencionais
 	fclose(arquivo);
 
 	djikstra(id, tabelaRoteamento, matriz);
@@ -20,7 +20,6 @@ void djikstra(int id, pair tabelaRoteamento[], int matriz[][NROUT]){
 	tabelaRoteamento[id].salto = id; // O próximo salto é ele mesmo
 	tabelaRoteamento[id].distancia = 0; // A distancia para ele mesmo é 0
 	conhecido[id] = 1;
-
 	while(aux != NROUT){
 		custo = INF;
 		for(i = 0; i < NROUT; i++){
@@ -94,7 +93,7 @@ void printRoteamento(int id, pair tabelaRoteamento[]){
 void menu(int id, int porta, char ip[], int novas){
 	system("clear");
 	printf(" ____________________________________________________________\n");
-	printf("|%s%d%17s%d%17s%s |\n", "Roteador: ", id, "Porta: ", porta, "IP: ", ip);
+	printf("|%s%d%17s%d%12s%-15s|\n", "Roteador: ", id, "Porta: ", porta, "IP: ", ip);
 	printf("|--------------------%d Mensagens Novas-----------------------|\n", novas);
 	printf(" LOG: %s\n", LOG);
 	printf("|------------------------------------------------------------|\n");
