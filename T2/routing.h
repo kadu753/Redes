@@ -15,21 +15,21 @@
 #define TOLERANCY 2 * REFRESH_TIME //Tempo até o roteador assumir que o vizinho caiu
 #define MAX_QUEUE 1123456 //Tamanho máximo da fila =~ 1123456
 #define MAX_MESSAGE 200 //Tamanho maximo da mensagem
-#define MAX_ADRESS 50 //Tamanho máximo de um endereço
+#define TAM_IP 30 //Tamanho máximo de um endereço
 #define NROUT 4 //Numero de Roteadores
 #define INF 112345678 //Infinito =~ 10^8
 
 //Estrutura de vizinho
 typedef struct{
   int id, orig_cost, cost, port, news;
-  char adress[MAX_ADRESS];
+  char adress[TAM_IP];
 } neighbour_t;
 
 typedef struct{
   int id;
   int porta;
   int qtdVizinhos;
-  char ip[MAX_ADRESS];
+  char ip[TAM_IP];
 } Roteador;
 
 //Estrutura de distância, para o vetor de distâncias
@@ -38,12 +38,13 @@ typedef struct{
 }dist_t;
 
 typedef struct{
-	int id;						// ID Roteador
-	int sock;					// Socket para enviar mensagem
-	int qtdNova;				// Qtd de novas mensagens
-	int qtdMsg;					// Qtd de mensagens recebidas
-	int tamMsg;					// Tamanho da mensagem
-}Tipo;
+  int id;
+  int porta;
+  int sock;
+  int qtdVizinhos;
+  int neigh_list[NROUT];
+  char ip[TAM_IP];
+}informacoesRoteador;
 
 //Estrutura de pacote
 typedef struct{
@@ -61,7 +62,7 @@ typedef struct{
 
 void die(char* msg);
 int toint(char *str);
-void inicializar(int id,
+void inicializar(Tipo infoRoteador,
                 neighbour_t neigh_info[NROUT],
                 dist_t routing_table[NROUT][NROUT],
                 int neigh_list[NROUT],
@@ -70,7 +71,8 @@ void inicializar(int id,
                 pack_queue_t *out,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
-                pthread_mutex_t *news_mutex);
+                pthread_mutex_t *news_mutex,
+                struct sockaddr_in *si_me);
           
 void configurarRoteadores(int id, 
                           Roteador roteador[],
@@ -81,7 +83,7 @@ void configurarEnlace(int id,
                       Roteador roteador[], 
                       neighbour_t neigh_info[NROUT]);
 
-void info(int id, int port, char adress[MAX_ADRESS], int neigh_qtty, int neigh_list[NROUT],
+void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
                 neighbour_t neigh_info[NROUT], dist_t routing_table[NROUT][NROUT]);
 void copy_package(package_t *a, package_t *b);
 void queue_dist_vec(pack_queue_t *out, int neigh_list[NROUT], dist_t routing_table[NROUT][NROUT],

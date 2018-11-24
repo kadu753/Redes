@@ -16,7 +16,7 @@ int toint(char *str){
 }
 
 //Função com rotina de inicialização dos roteadores
-void inicializar(int id,
+void inicializar(Tipo infoRoteador,
                 neighbour_t neigh_info[NROUT],
                 dist_t routing_table[NROUT][NROUT],
                 int neigh_list[NROUT],
@@ -25,9 +25,12 @@ void inicializar(int id,
                 pack_queue_t *out,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
-                pthread_mutex_t *news_mutex){
+                pthread_mutex_t *news_mutex,
+                struct sockaddr_in *si_me){
   int i, j, auxLista;
+  int id = infoRoteador.id;
 
+  printf("%d\n", id);
   //Inicializa o vetor de informações de vizinhos e a tabela de roteamento
   for(i = 0; i < NROUT; i++){
     neigh_info[i].news = 0;
@@ -37,7 +40,7 @@ void inicializar(int id,
       routing_table[i][j].dist = INF;
       routing_table[i][j].nhop = -1;
     }
-  
+  }
 
   configurarEnlace(id, neigh_list, roteador, neigh_info);
   configurarRoteadores(id, roteador, neigh_info);
@@ -62,20 +65,6 @@ void inicializar(int id,
   pthread_mutex_init(log_mutex, NULL);
   pthread_mutex_init(messages_mutex, NULL);
   pthread_mutex_init(news_mutex, NULL);
-
-  //Cria o socket(dominio, tipo, protocolo)
-  if ((*sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    die("Falha ao criar Socket\n");
-
-  //Inicializa endereços de estrutura
-  memset((char *) si_me, 0, sizeof(*si_me)); //Zera a estrutura
-  si_me->sin_family = AF_INET; //Familia
-  si_me->sin_addr.s_addr = si_send->sin_addr.s_addr = htonl(INADDR_ANY); //Atribui o socket a todo tipo de interface
-  si_me->sin_port = htons(*port); //Porta em ordem de bytes de rede
-
-  //Liga o socket a porta (atribui o endereço ao file descriptor)
-  if ( bind(*sock , (struct sockaddr*) si_me, sizeof(*si_me) ) == -1)
-    die("A ligacao do socket com a porta falhou\n");
 }
 
 void configurarEnlace(int id, 
@@ -103,12 +92,13 @@ void configurarRoteadores(int id,
                           Roteador roteador[],
                           neighbour_t neigh_info[NROUT]){
   int novoID, novaPorta;
-  char novoIP[MAX_ADRESS];
+  char novoIP[TAM_IP];
   FILE *arquivo = fopen("roteador.config", "r");
   if(!arquivo) die("Não foi possível abrir o arquivo de roteadores\n");
   while(fscanf(arquivo, "%d %d %s\n", &novoID, &novaPorta, novoIP) != EOF){
     if(novoID == id){
-      roteador[id].porta = novaPorta;
+      infoRoteador.porta = novaPorta;
+      //roteador[id].porta = novaPorta;
       strcpy(roteador[id].ip, novoIP);
     }
     if(neigh_info[novoID].id != -1){
@@ -120,7 +110,7 @@ void configurarRoteadores(int id,
 }
 
 //Imprime informações sobre o roteador
-void info(int id, int port, char adress[MAX_ADRESS], int neigh_qtty, int neigh_list[NROUT],
+void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
     neighbour_t neigh_info[NROUT], dist_t routing_table[NROUT][NROUT]){
   int i;
 
@@ -220,18 +210,12 @@ void print_rout_table(dist_t routing_table[NROUT][NROUT], FILE *file, int infile
         else fprintf(file, "I(X)| ");
       }
       else{
-        if (routing_table[i][j].dist != INF) {
-          printf("%d(%d)| ", routing_table[i][j].dist, routing_table[i][j].nhop);
-        } else {
-          printf("I(X)| ");
-        }
+        if (routing_table[i][j].dist != INF) printf("%d(%d)| ", routing_table[i][j].dist, routing_table[i][j].nhop);
+        else printf("I(X)| ");
       }
     }
-    if(file){
-      fprintf(file, "\n")
-    } else {
-      printf("\n");
-    } 
+    if (file) fprintf(file, "\n");
+    else printf("\n");
   }
 }
 

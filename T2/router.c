@@ -12,6 +12,7 @@ pthread_t sender_id, receiver_id, unpacker_id, refresher_id, pulse_checker_id; /
 pthread_mutex_t log_mutex, messages_mutex, news_mutex;
 FILE *logs, *messages;
 Roteador roteador[NROUT];
+Tipo infoRoteador;
 
 void* sender(void *nothing); //Thread responsavel por enviar pacotes
 void* receiver(void *nothing); //Thread responsavel por receber pacotes
@@ -23,7 +24,6 @@ int back_option_menu(int fallback_option); // Função auxiliar do menu. Retorna
 int main(int argc, char *argv[]){
   int menu_option = -1;
   int dest;
-  Tipo infoRoteador;
   char message[MAX_MESSAGE];
   char log_path[20] = "./logs/log";
   char message_path[20] = "./messages/message";
@@ -51,15 +51,40 @@ int main(int argc, char *argv[]){
   if (!(messages = fopen(message_path, "w+"))) die("Falha ao criar arquivo de mensagens");
 
   //Rotina de inicializacao do roteador
-  inicializar(infoRoteador.id, neigh_info, routing_table, neigh_list, roteador, &in, &out, &log_mutex, &messages_mutex, &news_mutex, sock);
+  //inicializar(infoRoteador.id, neigh_info, routing_table, neigh_list, roteador, &in, &out, &log_mutex, &messages_mutex, &news_mutex, &sock, &si_me);
+
+  inicializar(infoRoteador, neigh_info, routing_table, neigh_list, roteador, &in, &out, &log_mutex, &messages_mutex, &news_mutex, &si_me);
+
+  id = infoRoteador.id;
+
+  if((infoRoteador.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
+    die("Não foi possível criar o Socket!");
+  }
+  memset((char*) &si_me, 0, sizeof(si_me));
+  si_me.sin_family = AF_INET;
+  si_me.sin_port = htons(roteador[id].porta);
+  si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+
+  if(bind(infoRoteador.sock, (struct sockaddr*) &si_me, sizeof(si_me)) == -1)
+    die("Não foi possível conectar o socket com a porta\n");
+
+
+  sock = infoRoteador.sock;
+  port = roteador[id].porta;
+  neigh_qtty = roteador[id].qtdVizinhos;
 
   pthread_create(&sender_id, NULL, sender, NULL); //Cria thread emitidora
   pthread_create(&receiver_id, NULL, receiver, NULL); //Cria thread receptora
   pthread_create(&unpacker_id, NULL, unpacker, NULL); //Cria thread desempacotadora
   pthread_create(&refresher_id, NULL, refresher, NULL); //Cria thread atualizadora
   //pthread_create(&pulse_checker_id, NULL, pulse_checker, NULL); //Cria thread checadora de vivicidade
+
+  printf("id = %d\n", id);
+  printf("sock = %d\n", sock);
+  printf("porta = %d\n", port);
+
   while(1){
-    //system("clear");
+    system("clear");
     if (menu_option <= -1){
       if (menu_option == -2) { printf("Opção inválida\n\n"); }
 
@@ -117,7 +142,7 @@ int main(int argc, char *argv[]){
     }
 
     if (menu_option == 5){
-      //system("clear");
+      system("clear");
       break;
       continue;
     }
@@ -125,7 +150,7 @@ int main(int argc, char *argv[]){
   }
 
   //Fecha sockets e arquivos
-  close(infoRoteador.sock);
+  close(sock);
   fclose(logs);
   fclose(messages);
 
