@@ -1,6 +1,6 @@
 [SENDER] Enviador iniciado!
-[UNPACKER] Desempacotador iniciado!
 [RECEIVER] Receptor iniciado!
+[UNPACKER] Desempacotador iniciado!
 [UNPACKER] A tabela foi atualizada:
      0 |  1  |  2  |  3  |
 0 |0(0)| 4(2)| 2(2)| 4(2)| 
@@ -19,6 +19,8 @@
 1 |I(X)| I(X)| I(X)| I(X)| 
 2 |2(0)| 2(1)| 0(2)| 2(3)| 
 3 |4(2)| 4(2)| 2(2)| 0(3)| 
+[RECEIVER] Pacote recebido de 0
+[UNPACKER] Processando pacote de mensagem vindo de 0
 [RECEIVER] Pacote recebido de 0
 [UNPACKER] Roteando pacote com origem 0, para 3, via 3
 [SENDER] Pacote de dados enviado com sucesso para o nó 3

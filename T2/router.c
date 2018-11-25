@@ -3,8 +3,8 @@
 roteador_t roteador[NROUT];
 informacoesRoteador_t infoRoteador;
 roteadorVizinho_t infoVizinhos[NROUT];
-
-
+distSalto_t tabelaRoteamento[NROUT][NROUT]; //Tabela de roteamento do nó
+filaPacotes_t entrada, saida; //Filas de entrada e saida de pacotes
 
 
 
@@ -15,19 +15,17 @@ roteadorVizinho_t infoVizinhos[NROUT];
 
 int neigh_list[NROUT]; //Lista de vizinhos do roteador
 int slen = sizeof(si_me); //Tamanho do endereço
-dist_t routing_table[NROUT][NROUT]; //Tabela de roteamento do nó
-pack_queue_t in, out; //Filas de entrada e saida de pacotes
 pthread_mutex_t log_mutex, messages_mutex, news_mutex;
 FILE *logs, *messages;
 
 
 int main(int argc, char *argv[]){
   int menu_option = -1;
-  int dest;
+  int destino;
   char message[MAX_MESSAGE];
   char log_path[20] = "./logs/log";
   char message_path[20] = "./messages/message";
-  package_t pck;
+  pacote_t pck;
 
   // Certifica-se que os argumentos são válidos ao iniciar o programa
   if (argc < 2)
@@ -51,7 +49,7 @@ int main(int argc, char *argv[]){
   if (!(messages = fopen(message_path, "w+"))) die("Falha ao criar arquivo de mensagens");
 
   //Rotina de inicializacao do roteador
-  inicializar(&infoRoteador, infoVizinhos, routing_table, neigh_list, roteador, &in, &out, &log_mutex, &messages_mutex, &news_mutex, &si_me);
+  inicializar(&infoRoteador, infoVizinhos, tabelaRoteamento, neigh_list, roteador, &entrada, &saida, &log_mutex, &messages_mutex, &news_mutex, &si_me);
 
   if((infoRoteador.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
     die("Não foi possível criar o Socket!");
@@ -88,7 +86,7 @@ int main(int argc, char *argv[]){
     }
 
     if (menu_option == 1){
-      info(infoRoteador.id, infoRoteador.porta, infoRoteador.ip, infoRoteador.qtdVizinhos, neigh_list, infoVizinhos, routing_table);
+      info(infoRoteador.id, infoRoteador.porta, infoRoteador.ip, infoRoteador.qtdVizinhos, neigh_list, infoVizinhos, tabelaRoteamento);
       menu_option = back_option_menu(1);
       continue;
     }
@@ -111,16 +109,16 @@ int main(int argc, char *argv[]){
 
     if (menu_option == 4){
       printf("Insira o roteador de destino: ");
-      scanf("%d", &dest);
+      scanf("%d", &destino);
       getchar();
       printf("Insira uma mensagem de no máximo %d caracteres:\n", MAX_MESSAGE);
       fgets(message, MAX_MESSAGE, stdin);
-      pck.dest = dest; pck.control = 0;
-      pck.orig = infoRoteador.id;
-      strcpy(pck.message, message);
-      pthread_mutex_lock(&out.mutex);
-      copy_package(&pck, &out.queue[out.end++]); //Enfilera o novo pacote na fila de saida
-      pthread_mutex_unlock(&out.mutex);
+      pck.destino = destino; pck.controle = 0;
+      pck.origem = infoRoteador.id;
+      strcpy(pck.mensagem, message);
+      pthread_mutex_lock(&saida.mutex);
+      copy_package(&pck, &saida.filaPacotes[saida.fim++]); //Enfilera o novo pacote na fila de saida
+      pthread_mutex_unlock(&saida.mutex);
 
       printf("Mensagem encaminhada!\n");
       sleep(3);
@@ -154,18 +152,18 @@ int back_option_menu(int fallback_option) {
 
 void* sender(void *nothing){
   int new_dest;
-  package_t *pck;
+  pacote_t *pck;
 
   pthread_mutex_lock(&log_mutex);
   fprintf(logs, "[SENDER] Enviador iniciado!\n");
   pthread_mutex_unlock(&log_mutex);
   while(1){
-    pthread_mutex_lock(&out.mutex);
-    while(out.begin != out.end){
-      pck = &(out.queue[out.begin]); //Aponta o pacote a ser enviado
+    pthread_mutex_lock(&saida.mutex);
+    while(saida.inicio != saida.fim){
+      pck = &(saida.filaPacotes[saida.inicio]); //Aponta o pacote a ser enviado
 
       //TO CHECK
-      new_dest = routing_table[infoRoteador.id][pck->dest].nhop; //Pega o próximo destino (next hop)
+      new_dest = tabelaRoteamento[infoRoteador.id][pck->destino].proxSalto; //Pega o próximo destino (next hop)
 
       si_me.sin_port = htons(infoVizinhos[new_dest].porta); //Atribui a porta do pacote a ser enviado
       if (inet_aton(infoVizinhos[new_dest].ip , &si_me.sin_addr) == 0 && !CLEAR_LOG){
@@ -178,59 +176,59 @@ void* sender(void *nothing){
         if (sendto(infoRoteador.sock, pck, sizeof(*pck), 0, (struct sockaddr*) &si_me, slen) == -1){
           pthread_mutex_lock(&log_mutex);
           fprintf(logs, "[SENDER] Falha ao enviar Pacote de %s ao nó %d\n"
-                  ,out.queue[out.begin].control ? "controle" : "dados", out.queue[out.begin].dest);
+                  ,saida.filaPacotes[saida.inicio].controle ? "controle" : "dados", saida.filaPacotes[saida.inicio].destino);
           pthread_mutex_unlock(&log_mutex);
         }
         else{
-          if (!CLEAR_LOG || (CLEAR_LOG && !pck->control)){
+          if (!CLEAR_LOG || (CLEAR_LOG && !pck->controle)){
             pthread_mutex_lock(&log_mutex);
             fprintf(logs, "[SENDER] Pacote de %s enviado com sucesso para o nó %d\n"
-                    ,out.queue[out.begin].control ? "controle" : "dados", out.queue[out.begin].dest);
+                    ,saida.filaPacotes[saida.inicio].controle ? "controle" : "dados", saida.filaPacotes[saida.inicio].destino);
             pthread_mutex_unlock(&log_mutex);
           }
         }
       }
-      out.begin++;
+      saida.inicio++;
     }
-    pthread_mutex_unlock(&out.mutex);
+    pthread_mutex_unlock(&saida.mutex);
   }
 }
 
 void* unpacker(void *nothing){
   int i, retransmit, changed;
-  package_t *pck;
+  pacote_t *pck;
 
   pthread_mutex_lock(&log_mutex);
   fprintf(logs, "[UNPACKER] Desempacotador iniciado!\n");
   pthread_mutex_unlock(&log_mutex);
 
   while(1){
-    pthread_mutex_lock(&in.mutex);
-    while(in.begin != in.end){
-      pck = &in.queue[in.begin];
-      if (pck->dest == infoRoteador.id){ //Se o pacote é pra mim
-        if (!CLEAR_LOG || (CLEAR_LOG && !pck->control)){
+    pthread_mutex_lock(&entrada.mutex);
+    while(entrada.inicio != entrada.fim){
+      pck = &entrada.filaPacotes[entrada.inicio];
+      if (pck->destino == infoRoteador.id){ //Se o pacote é pra mim
+        if (!CLEAR_LOG || (CLEAR_LOG && !pck->controle)){
           pthread_mutex_lock(&log_mutex);
           fprintf(logs, "[UNPACKER] Processando pacote de %s vindo de %d\n",
-            pck->control ? "controle" : "mensagem", pck->orig);
+            pck->controle ? "controle" : "mensagem", pck->origem);
           pthread_mutex_unlock(&log_mutex);
         }
-        if (pck->control){
+        if (pck->controle){
           //Marca que ouviu falar dele
           pthread_mutex_lock(&news_mutex);
-          infoVizinhos[pck->orig].novidade = 1;
+          infoVizinhos[pck->origem].novidade = 1;
           pthread_mutex_unlock(&news_mutex);
           for(i = retransmit = changed = 0; i < NROUT; i++){
             //Se o vetor de distancias que o no enviou eh diferente do o no possui, atualiza
-            if (routing_table[pck->orig][i].dist != pck->dist_vector[i].dist ||
-               routing_table[pck->orig][i].nhop != pck->dist_vector[i].nhop){
-              routing_table[pck->orig][i].dist = pck->dist_vector[i].dist;
-              routing_table[pck->orig][i].nhop = pck->dist_vector[i].nhop;
+            if (tabelaRoteamento[pck->origem][i].distancia != pck->vetorDistancia[i].distancia ||
+               tabelaRoteamento[pck->origem][i].proxSalto != pck->vetorDistancia[i].proxSalto){
+              tabelaRoteamento[pck->origem][i].distancia = pck->vetorDistancia[i].distancia;
+              tabelaRoteamento[pck->origem][i].proxSalto = pck->vetorDistancia[i].proxSalto;
               changed = 1;
               //Se a distancia ate o destino, mais o custo ate o no for maior o que ja tem, relaxa
-              if (pck->dist_vector[i].dist + infoVizinhos[pck->orig].custo < routing_table[infoRoteador.id][i].dist){
-                routing_table[infoRoteador.id][i].dist = pck->dist_vector[i].dist + infoVizinhos[pck->orig].custo;
-                routing_table[infoRoteador.id][i].nhop = pck->orig;
+              if (pck->vetorDistancia[i].distancia + infoVizinhos[pck->origem].custo < tabelaRoteamento[infoRoteador.id][i].distancia){
+                tabelaRoteamento[infoRoteador.id][i].distancia = pck->vetorDistancia[i].distancia + infoVizinhos[pck->origem].custo;
+                tabelaRoteamento[infoRoteador.id][i].proxSalto = pck->origem;
                 retransmit = 1;
               }
             }
@@ -238,41 +236,41 @@ void* unpacker(void *nothing){
           if (changed){
             pthread_mutex_lock(&log_mutex);
             fprintf(logs, "[UNPACKER] A tabela foi atualizada:\n");
-            print_rout_table(routing_table, logs, 1);
+            print_rout_table(tabelaRoteamento, logs, 1);
             pthread_mutex_unlock(&log_mutex);
           }
           if (retransmit){
             pthread_mutex_lock(&log_mutex);
             fprintf(logs, "[UNPACKER] O vetor de distancias mudou, enfileirando atualização pros vizinhos.\n");
-            queue_dist_vec(&out, neigh_list, routing_table, infoRoteador.id, infoRoteador.qtdVizinhos);
+            queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
             pthread_mutex_unlock(&log_mutex);
           }
         }
         else{ //Se é uma mensagem
           pthread_mutex_lock(&messages_mutex);
-          fprintf(messages, "Roteador %d: ", pck->orig);
-          fprintf(messages, "%s", pck->message);
+          fprintf(messages, "Roteador %d: ", pck->origem);
+          fprintf(messages, "%s", pck->mensagem);
           pthread_mutex_unlock(&messages_mutex);
         }
       }
       else{ //Se não é pra mim
-        if (!CLEAR_LOG || (CLEAR_LOG && !pck->control)){
+        if (!CLEAR_LOG || (CLEAR_LOG && !pck->controle)){
           pthread_mutex_lock(&log_mutex);
-          fprintf(logs, "[UNPACKER] Roteando pacote com origem %d, para %d, via %d\n", pck->orig, pck->dest, routing_table[infoRoteador.id][pck->dest].nhop);
+          fprintf(logs, "[UNPACKER] Roteando pacote com origem %d, para %d, via %d\n", pck->origem, pck->destino, tabelaRoteamento[infoRoteador.id][pck->destino].proxSalto);
           pthread_mutex_unlock(&log_mutex);
         }
-        pthread_mutex_lock(&out.mutex);
-        copy_package(pck, &out.queue[out.end++]); //Enfilero ele na fila de saida
-        pthread_mutex_unlock(&out.mutex);
+        pthread_mutex_lock(&saida.mutex);
+        copy_package(pck, &saida.filaPacotes[saida.fim++]); //Enfilero ele na fila de saida
+        pthread_mutex_unlock(&saida.mutex);
       }
-      in.begin++;
+      entrada.inicio++;
     }
-    pthread_mutex_unlock(&in.mutex);
+    pthread_mutex_unlock(&entrada.mutex);
   }
 }
 
 void* receiver(void *nothing){
-  package_t received;
+  pacote_t received;
 
   pthread_mutex_lock(&log_mutex);
   fprintf(logs, "[RECEIVER] Receptor iniciado!\n");
@@ -285,16 +283,16 @@ void* receiver(void *nothing){
       continue;
     }
 
-    if (!CLEAR_LOG || (CLEAR_LOG && !received.control)){
+    if (!CLEAR_LOG || (CLEAR_LOG && !received.controle)){
       pthread_mutex_lock(&log_mutex);
-      fprintf(logs, "[RECEIVER] Pacote recebido de %d\n", received.orig);
+      fprintf(logs, "[RECEIVER] Pacote recebido de %d\n", received.origem);
       pthread_mutex_unlock(&log_mutex);
     }
 
-    pthread_mutex_lock(&in.mutex);
-    copy_package(&received, &in.queue[in.end++]); //Coloca o pacote no final da fila de recebidos
-    pthread_mutex_unlock(&in.mutex);
-    //print_pack_queue(&in);
+    pthread_mutex_lock(&entrada.mutex);
+    copy_package(&received, &entrada.filaPacotes[entrada.fim++]); //Coloca o pacote no final da fila de recebidos
+    pthread_mutex_unlock(&entrada.mutex);
+    //print_pack_queue(&entrada);
   }
 }
 
@@ -303,7 +301,7 @@ void *refresher(void *nothing){
     if (!CLEAR_LOG) {
       fprintf(logs, "[REFRESHER] Enfileirando atualizações de vetor de distância\n");
     }
-    queue_dist_vec(&out, neigh_list, routing_table, infoRoteador.id, infoRoteador.qtdVizinhos);
+    queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
     sleep(REFRESH_TIME);
   }
 }
@@ -330,8 +328,8 @@ void* pulse_checker(void *nothing){
           pthread_mutex_lock(&log_mutex);
           fprintf(logs, "[PULSE_CHECKER] Parece que o nó %d Ressucitou!\n", infoVizinhos[neigh].id);
           pthread_mutex_unlock(&log_mutex);
-          routing_table[infoRoteador.id][neigh].dist = infoVizinhos[neigh].custoOriginal;
-          routing_table[infoRoteador.id][neigh].nhop = neigh;
+          tabelaRoteamento[infoRoteador.id][neigh].distancia = infoVizinhos[neigh].custoOriginal;
+          tabelaRoteamento[infoRoteador.id][neigh].proxSalto = neigh;
           infoVizinhos[neigh].custo = infoVizinhos[neigh].custoOriginal;
           recalculate = 1;
         }
@@ -340,31 +338,31 @@ void* pulse_checker(void *nothing){
         pthread_mutex_lock(&log_mutex);
         fprintf(logs, "[PULSE_CHECKER] Parece que o nó %d morreu!\n", infoVizinhos[neigh].id);
         pthread_mutex_unlock(&log_mutex);
-        routing_table[infoRoteador.id][neigh].dist = INF;
-        routing_table[infoRoteador.id][neigh].nhop = -1;
+        tabelaRoteamento[infoRoteador.id][neigh].distancia = INF;
+        tabelaRoteamento[infoRoteador.id][neigh].proxSalto = -1;
         infoVizinhos[neigh].custo = INF;
         recalculate = 1;
       }
       if (recalculate){
         fprintf(logs, "[PULSE_CHECKER] Calculando novo vetor de distancia...\n");
         for(i = 0; i < NROUT; i++){
-          if (routing_table[infoRoteador.id][i].nhop == neigh){
+          if (tabelaRoteamento[infoRoteador.id][i].proxSalto == neigh){
             new_min = INF; through = -1;
             for(j = 0; j < NROUT; j++){
-              if (routing_table[j][i].dist + infoVizinhos[j].custo < new_min){ //JI?
-                new_min = routing_table[j][i].dist + infoVizinhos[j].custo;
+              if (tabelaRoteamento[j][i].distancia + infoVizinhos[j].custo < new_min){ //JI?
+                new_min = tabelaRoteamento[j][i].distancia + infoVizinhos[j].custo;
                 through = j;
               }
             }
-            routing_table[infoRoteador.id][i].dist = new_min;
-            routing_table[infoRoteador.id][i].nhop = through;
+            tabelaRoteamento[infoRoteador.id][i].distancia = new_min;
+            tabelaRoteamento[infoRoteador.id][i].proxSalto = through;
           }
         }
       }
     }
     pthread_mutex_unlock(&news_mutex);
     if (recalculate) {
-      queue_dist_vec(&out, neigh_list, routing_table, infoRoteador.id, infoRoteador.qtdVizinhos);
+      queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
     }
   }
 }

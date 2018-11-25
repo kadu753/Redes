@@ -35,9 +35,7 @@ typedef struct{
   int porta;
   int novidade;
   char ip[TAM_IP];
-  //int id, orig_cost, cost, port, news;
-  //char adress[TAM_IP];
-} roteadorVizinho_t; //neighbour_t;
+} roteadorVizinho_t;
 
 typedef struct{
   int id;
@@ -48,8 +46,9 @@ typedef struct{
 
 //Estrutura de distância, para o vetor de distâncias
 typedef struct{
-  int dist, nhop;
-}dist_t;
+  int distancia;
+  int proxSalto;
+}distSalto_t;
 
 typedef struct{
   int id;
@@ -61,27 +60,30 @@ typedef struct{
 
 //Estrutura de pacote
 typedef struct{
-  int control, dest, orig;
-  char message[MAX_MESSAGE];
-  dist_t dist_vector[NROUT];
-}package_t;
+  int controle;
+  int destino;
+  int origem;
+  char mensagem[MAX_MESSAGE];
+  distSalto_t vetorDistancia[NROUT];
+}pacote_t;
 
 //Fila de pacotes
 typedef struct{
+  int inicio;
+  int fim;
+  pacote_t filaPacotes[MAX_QUEUE];
   pthread_mutex_t mutex;
-  int begin, end;
-  package_t queue[MAX_QUEUE];
-}pack_queue_t;
+}filaPacotes_t;
 
 void die(char* msg);
 int toint(char *str);
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[NROUT],
-                dist_t routing_table[NROUT][NROUT],
+                distSalto_t tabelaRoteamento[NROUT][NROUT],
                 int neigh_list[NROUT],
                 roteador_t roteador[],
-                pack_queue_t *in,
-                pack_queue_t *out,
+                filaPacotes_t *entrada,
+                filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
                 pthread_mutex_t *news_mutex,
@@ -97,12 +99,12 @@ void configurarEnlace(int id,
                       roteadorVizinho_t infoVizinhos[NROUT]);
 
 void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
-                roteadorVizinho_t infoVizinhos[NROUT], dist_t routing_table[NROUT][NROUT]);
-void copy_package(package_t *a, package_t *b);
-void queue_dist_vec(pack_queue_t *out, int neigh_list[NROUT], dist_t routing_table[NROUT][NROUT],
+                roteadorVizinho_t infoVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT]);
+void copy_package(pacote_t *a, pacote_t *b);
+void queue_dist_vec(filaPacotes_t *saida, int neigh_list[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT],
                     int id, int neigh_qtty);
-void print_pack_queue(pack_queue_t *queue);
-void print_rout_table(dist_t routing_table[NROUT][NROUT], FILE *file, int infile);
+void print_pack_queue(filaPacotes_t *filaPacotes);
+void print_rout_table(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *file, int infile);
 void print_file(FILE *file, pthread_mutex_t *mutex);
 void* sender(void *nothing); //Thread responsavel por enviar pacotes
 void* receiver(void *nothing); //Thread responsavel por receber pacotes

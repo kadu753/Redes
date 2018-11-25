@@ -18,11 +18,11 @@ int toint(char *str){
 //Função com rotina de inicialização dos roteadores
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[NROUT],
-                dist_t routing_table[NROUT][NROUT],
+                distSalto_t tabelaRoteamento[NROUT][NROUT],
                 int neigh_list[NROUT],
                 roteador_t roteador[],
-                pack_queue_t *in,
-                pack_queue_t *out,
+                filaPacotes_t *entrada,
+                filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
                 pthread_mutex_t *news_mutex,
@@ -39,8 +39,8 @@ void inicializar(informacoesRoteador_t *infoRoteador,
     //neigh_info[i].id = neigh_info[i].port = -1;
     //neigh_info[i].cost = INF;
     for(j = 0; j < NROUT; j++){
-      routing_table[i][j].dist = INF;
-      routing_table[i][j].nhop = -1;
+      tabelaRoteamento[i][j].distancia = INF;
+      tabelaRoteamento[i][j].proxSalto = -1;
     }
   }
 
@@ -48,22 +48,22 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   configurarRoteadores(infoRoteador, roteador, infoVizinhos);
 
   //Custo de um nó para ele mesmo é 0, via ele mesmo
-  routing_table[id][id].dist = 0;
-  routing_table[id][id].nhop = id;
+  tabelaRoteamento[id][id].distancia = 0;
+  tabelaRoteamento[id][id].proxSalto = id;
 
   //Preenche o vetor de distâncias inicial do nó
   for(i = 0; i < roteador[id].qtdVizinhos; i++){
     auxLista = neigh_list[i];
-    routing_table[id][auxLista].dist = infoVizinhos[auxLista].custo;
-    routing_table[id][auxLista].nhop = infoVizinhos[auxLista].id;
+    tabelaRoteamento[id][auxLista].distancia = infoVizinhos[auxLista].custo;
+    tabelaRoteamento[id][auxLista].proxSalto = infoVizinhos[auxLista].id;
   }
   
   infoRoteador->qtdVizinhos = roteador[id].qtdVizinhos;
 
   //Inicializa as filas de entrada e saida
-  in->begin = out->begin = in->end = out->end = 0;
-  pthread_mutex_init(&(in->mutex), NULL);
-  pthread_mutex_init(&(out->mutex), NULL);
+  entrada->inicio = saida->inicio = entrada->fim = saida->fim = 0;
+  pthread_mutex_init(&(entrada->mutex), NULL);
+  pthread_mutex_init(&(saida->mutex), NULL);
 
   //Inicializa mutex dos arquivos de log e mensagens e de checagem de queda de nó
   pthread_mutex_init(log_mutex, NULL);
@@ -121,7 +121,7 @@ void configurarRoteadores(informacoesRoteador_t *infoRoteador,
 
 //Imprime informações sobre o roteador
 void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
-    roteadorVizinho_t infoVizinhos[NROUT], dist_t routing_table[NROUT][NROUT]){
+    roteadorVizinho_t infoVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT]){
   int i;
 
   printf("O nó %d, está conectado à porta %d, Seu endereço é %s\n\n", id, port, adress);
@@ -133,75 +133,75 @@ void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[
   printf("\n");
 
   printf("Essa é sua tabela de roteamento, atualmente:\n");
-  print_rout_table(routing_table, NULL, 0);
+  print_rout_table(tabelaRoteamento, NULL, 0);
 }
 
 //Copia o pacote a para o pacote b
-void copy_package(package_t *a, package_t *b){
+void copy_package(pacote_t *a, pacote_t *b){
   int i;
 
-  b->control = a->control;
-  b->dest = a->dest;
-  b->orig = a->orig;
-  strcpy(b->message, a->message);
+  b->controle = a->controle;
+  b->destino = a->destino;
+  b->origem = a->origem;
+  strcpy(b->mensagem, a->mensagem);
   for(i = 0; i < NROUT; i++){
-    b->dist_vector[i].dist = a->dist_vector[i].dist;
-    b->dist_vector[i].nhop = a->dist_vector[i].nhop;
+    b->vetorDistancia[i].distancia = a->vetorDistancia[i].distancia;
+    b->vetorDistancia[i].proxSalto = a->vetorDistancia[i].proxSalto;
   }
 }
 
 //Enfilera um pacote para cada vizinho do nó, contendo seu vetor de distancia
 void queue_dist_vec(
-                      pack_queue_t *out,
+                      filaPacotes_t *saida,
                       int neigh_list[NROUT],
-                      dist_t routing_table[NROUT][NROUT],
+                      distSalto_t tabelaRoteamento[NROUT][NROUT],
                       int id,
                       int neigh_qtty
                     ) {
   int i, j;
 
-  pthread_mutex_lock(&(out->mutex));
-  for(i = 0; i < neigh_qtty; i++, out->end++){
-    package_t *pck = &(out->queue[out->end]);
-    pck->control = 1;
-    pck->orig = id;
-    pck->dest = neigh_list[i];
+  pthread_mutex_lock(&(saida->mutex));
+  for(i = 0; i < neigh_qtty; i++, saida->fim++){
+    pacote_t *pck = &(saida->filaPacotes[saida->fim]);
+    pck->controle = 1;
+    pck->origem = id;
+    pck->destino = neigh_list[i];
     //printf("Enfileirando pacote de vetor de distancia para o destino %d\n", pck->dist);
     //printf("Vetor de distancia enviado: ");
     for(j = 0; j < NROUT; j++){
-      pck->dist_vector[j].dist = routing_table[id][j].dist;
-      pck->dist_vector[j].nhop = routing_table[id][j].nhop;
-      //printf("(%d,%d) ", pck->dist_vector[j].dist, pck->dist_vector[j].nhop);
+      pck->vetorDistancia[j].distancia = tabelaRoteamento[id][j].distancia;
+      pck->vetorDistancia[j].proxSalto = tabelaRoteamento[id][j].proxSalto;
+      //printf("(%d,%d) ", pck->vetorDistancia[j].distancia, pck->vetorDistancia[j].proxSalto);
     }
   }
-  pthread_mutex_unlock(&(out->mutex));
+  pthread_mutex_unlock(&(saida->mutex));
 }
 
 //Funcao que imprime tudo que está numa fila
-void print_pack_queue(pack_queue_t *queue){
+void print_pack_queue(filaPacotes_t *filaPacotes){
   int i, j;
-  package_t *pck;
+  pacote_t *pck;
 
-  pthread_mutex_lock(&(queue->mutex));
-  printf("%d Pacotes nessa fila:\n", queue->end - queue->begin);
-  for(i = queue->begin; i < queue->end; i++){
-    pck = &(queue->queue[i]);
-    printf("\nPacote %s de controle, Destino: %d, Origem: %d\n", pck->control ? "é" : "não é", pck->dest, pck->orig);
-    if (pck->control){
+  pthread_mutex_lock(&(filaPacotes->mutex));
+  printf("%d Pacotes nessa fila:\n", filaPacotes->fim - filaPacotes->inicio);
+  for(i = filaPacotes->inicio; i < filaPacotes->fim; i++){
+    pck = &(filaPacotes->filaPacotes[i]);
+    printf("\nPacote %s de controle, Destino: %d, Origem: %d\n", pck->controle ? "é" : "não é", pck->destino, pck->origem);
+    if (pck->controle){
       printf("Vetor de distância do pacote: ");
       for(j = 0; j < NROUT; j++){
-        printf("(%d,%d), ", pck->dist_vector[j].dist, pck->dist_vector[j].nhop);
+        printf("(%d,%d), ", pck->vetorDistancia[j].distancia, pck->vetorDistancia[j].proxSalto);
       }
       printf("\n");
     }
-    else printf("Mensagem do pacote: %s\n", pck->message);
+    else printf("Mensagem do pacote: %s\n", pck->mensagem);
   }
   printf("\n");
-  pthread_mutex_unlock(&(queue->mutex));
+  pthread_mutex_unlock(&(filaPacotes->mutex));
 }
 
 //Funcao que imprime a tabela de roteamento
-void print_rout_table(dist_t routing_table[NROUT][NROUT], FILE *file, int infile){
+void print_rout_table(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *file, int infile){
   int i, j;
 
   if (infile) fprintf(file, "   ");
@@ -217,11 +217,11 @@ void print_rout_table(dist_t routing_table[NROUT][NROUT], FILE *file, int infile
     else printf("%d |", i);
     for(j = 0; j < NROUT; j++){
       if (infile){
-        if (routing_table[i][j].dist != INF) fprintf(file, "%d(%d)| ", routing_table[i][j].dist, routing_table[i][j].nhop);
+        if (tabelaRoteamento[i][j].distancia != INF) fprintf(file, "%d(%d)| ", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto);
         else fprintf(file, "I(X)| ");
       }
       else{
-        if (routing_table[i][j].dist != INF) printf("%d(%d)| ", routing_table[i][j].dist, routing_table[i][j].nhop);
+        if (tabelaRoteamento[i][j].distancia != INF) printf("%d(%d)| ", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto);
         else printf("I(X)| ");
       }
     }
