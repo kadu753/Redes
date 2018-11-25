@@ -16,11 +16,11 @@ int toint(char *str){
 }
 
 //Função com rotina de inicialização dos roteadores
-void inicializar(Tipo infoRoteador,
-                neighbour_t neigh_info[NROUT],
+void inicializar(informacoesRoteador_t *infoRoteador,
+                roteadorVizinho_t infoVizinhos[NROUT],
                 dist_t routing_table[NROUT][NROUT],
                 int neigh_list[NROUT],
-                Roteador roteador[],
+                roteador_t roteador[],
                 pack_queue_t *in,
                 pack_queue_t *out,
                 pthread_mutex_t *log_mutex,
@@ -28,22 +28,24 @@ void inicializar(Tipo infoRoteador,
                 pthread_mutex_t *news_mutex,
                 struct sockaddr_in *si_me){
   int i, j, auxLista;
-  int id = infoRoteador.id;
+  int id = infoRoteador->id;
 
-  printf("%d\n", id);
   //Inicializa o vetor de informações de vizinhos e a tabela de roteamento
   for(i = 0; i < NROUT; i++){
-    neigh_info[i].news = 0;
-    neigh_info[i].id = neigh_info[i].port = -1;
-    neigh_info[i].cost = INF;
+    infoVizinhos[i].novidade = 0;
+    infoVizinhos[i].id = infoVizinhos[i].porta = -1;
+    infoVizinhos[i].custo = INF;
+    //neigh_info[i].news = 0;
+    //neigh_info[i].id = neigh_info[i].port = -1;
+    //neigh_info[i].cost = INF;
     for(j = 0; j < NROUT; j++){
       routing_table[i][j].dist = INF;
       routing_table[i][j].nhop = -1;
     }
   }
 
-  configurarEnlace(id, neigh_list, roteador, neigh_info);
-  configurarRoteadores(id, roteador, neigh_info);
+  configurarEnlace(id, neigh_list, roteador, infoVizinhos);
+  configurarRoteadores(infoRoteador, roteador, infoVizinhos);
 
   //Custo de um nó para ele mesmo é 0, via ele mesmo
   routing_table[id][id].dist = 0;
@@ -52,10 +54,12 @@ void inicializar(Tipo infoRoteador,
   //Preenche o vetor de distâncias inicial do nó
   for(i = 0; i < roteador[id].qtdVizinhos; i++){
     auxLista = neigh_list[i];
-    routing_table[id][auxLista].dist = neigh_info[auxLista].cost;
-    routing_table[id][auxLista].nhop = neigh_info[auxLista].id;
+    routing_table[id][auxLista].dist = infoVizinhos[auxLista].custo;
+    routing_table[id][auxLista].nhop = infoVizinhos[auxLista].id;
   }
   
+  infoRoteador->qtdVizinhos = roteador[id].qtdVizinhos;
+
   //Inicializa as filas de entrada e saida
   in->begin = out->begin = in->end = out->end = 0;
   pthread_mutex_init(&(in->mutex), NULL);
@@ -69,8 +73,8 @@ void inicializar(Tipo infoRoteador,
 
 void configurarEnlace(int id, 
                       int neigh_list[NROUT], 
-                      Roteador roteador[], 
-                      neighbour_t neigh_info[NROUT]){
+                      roteador_t roteador[], 
+                      roteadorVizinho_t infoVizinhos[NROUT]){
   int r1, r2, dist;
   FILE *arquivo = fopen("enlaces.config", "r");
   if(!arquivo) die("Não foi possível abrir o arquivo de enlaces\n");
@@ -81,29 +85,35 @@ void configurarEnlace(int id,
     }
     if(r1 == id){
       neigh_list[roteador[id].qtdVizinhos++] = r2;
-      neigh_info[r2].id = r2;
-      neigh_info[r2].cost = neigh_info[r2].orig_cost = dist;
+      infoVizinhos[r2].id = r2;
+      infoVizinhos[r2].custo = infoVizinhos[r2].custoOriginal = dist;
+      //neigh_info[r2].id = r2;
+      //neigh_info[r2].cost = neigh_info[r2].orig_cost = dist;
     }
   }
   fclose(arquivo);
 }
 
-void configurarRoteadores(int id, 
-                          Roteador roteador[],
-                          neighbour_t neigh_info[NROUT]){
+void configurarRoteadores(informacoesRoteador_t *infoRoteador, 
+                          roteador_t roteador[],
+                          roteadorVizinho_t infoVizinhos[NROUT]){
+  int id = infoRoteador->id;
   int novoID, novaPorta;
   char novoIP[TAM_IP];
   FILE *arquivo = fopen("roteador.config", "r");
   if(!arquivo) die("Não foi possível abrir o arquivo de roteadores\n");
   while(fscanf(arquivo, "%d %d %s\n", &novoID, &novaPorta, novoIP) != EOF){
     if(novoID == id){
-      infoRoteador.porta = novaPorta;
-      //roteador[id].porta = novaPorta;
+      infoRoteador->porta = novaPorta;
+      roteador[id].porta = novaPorta;
       strcpy(roteador[id].ip, novoIP);
+      strcpy(infoRoteador->ip, novoIP);
     }
-    if(neigh_info[novoID].id != -1){
-      neigh_info[novoID].port = novaPorta;
-      strcpy(neigh_info[novoID].adress, novoIP);
+    if(infoVizinhos[novoID].id != -1){
+      infoVizinhos[novoID].porta = novaPorta;
+      strcpy(infoVizinhos[novoID].ip, novoIP);
+      //neigh_info[novoID].port = novaPorta;
+      //strcpy(neigh_info[novoID].adress, novoIP);
     }
   }
   fclose(arquivo);
@@ -111,14 +121,15 @@ void configurarRoteadores(int id,
 
 //Imprime informações sobre o roteador
 void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
-    neighbour_t neigh_info[NROUT], dist_t routing_table[NROUT][NROUT]){
+    roteadorVizinho_t infoVizinhos[NROUT], dist_t routing_table[NROUT][NROUT]){
   int i;
 
   printf("O nó %d, está conectado à porta %d, Seu endereço é %s\n\n", id, port, adress);
   printf("Seus vizinhos são:\n");
   for(i = 0; i < neigh_qtty; i++)
     printf("O roteador %d, com enlace de custo %d, na porta %d, e endereço %s\n", neigh_list[i],
-      neigh_info[neigh_list[i]].cost, neigh_info[neigh_list[i]].port, neigh_info[neigh_list[i]].adress);
+    infoVizinhos[neigh_list[i]].custo, infoVizinhos[neigh_list[i]].porta, infoVizinhos[neigh_list[i]].ip);  
+    //neigh_info[neigh_list[i]].cost, neigh_info[neigh_list[i]].port, neigh_info[neigh_list[i]].adress);
   printf("\n");
 
   printf("Essa é sua tabela de roteamento, atualmente:\n");
