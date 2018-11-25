@@ -19,8 +19,7 @@ int toint(char *str){
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[NROUT],
                 distSalto_t tabelaRoteamento[NROUT][NROUT],
-                int neigh_list[NROUT],
-                roteador_t roteador[],
+                int listaVizinhos[NROUT],
                 filaPacotes_t *entrada,
                 filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
@@ -35,30 +34,27 @@ void inicializar(informacoesRoteador_t *infoRoteador,
     infoVizinhos[i].novidade = 0;
     infoVizinhos[i].id = infoVizinhos[i].porta = -1;
     infoVizinhos[i].custo = INF;
-    //neigh_info[i].news = 0;
-    //neigh_info[i].id = neigh_info[i].port = -1;
-    //neigh_info[i].cost = INF;
     for(j = 0; j < NROUT; j++){
       tabelaRoteamento[i][j].distancia = INF;
       tabelaRoteamento[i][j].proxSalto = -1;
     }
   }
 
-  configurarEnlace(id, neigh_list, roteador, infoVizinhos);
-  configurarRoteadores(infoRoteador, roteador, infoVizinhos);
+  configurarEnlace(infoRoteador, listaVizinhos, infoVizinhos);
+  configurarRoteadores(infoRoteador, infoVizinhos);
 
   //Custo de um nó para ele mesmo é 0, via ele mesmo
   tabelaRoteamento[id][id].distancia = 0;
   tabelaRoteamento[id][id].proxSalto = id;
 
   //Preenche o vetor de distâncias inicial do nó
-  for(i = 0; i < roteador[id].qtdVizinhos; i++){
-    auxLista = neigh_list[i];
+  for(i = 0; i < infoRoteador->qtdVizinhos; i++){
+    auxLista = listaVizinhos[i];
     tabelaRoteamento[id][auxLista].distancia = infoVizinhos[auxLista].custo;
     tabelaRoteamento[id][auxLista].proxSalto = infoVizinhos[auxLista].id;
   }
   
-  infoRoteador->qtdVizinhos = roteador[id].qtdVizinhos;
+  //infoRoteador->qtdVizinhos = roteador[id].qtdVizinhos;
 
   //Inicializa as filas de entrada e saida
   entrada->inicio = saida->inicio = entrada->fim = saida->fim = 0;
@@ -71,10 +67,10 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   pthread_mutex_init(news_mutex, NULL);
 }
 
-void configurarEnlace(int id, 
-                      int neigh_list[NROUT], 
-                      roteador_t roteador[], 
+void configurarEnlace(informacoesRoteador_t *infoRoteador,
+                      int listaVizinhos[NROUT],
                       roteadorVizinho_t infoVizinhos[NROUT]){
+  int id = infoRoteador->id;
   int r1, r2, dist;
   FILE *arquivo = fopen("enlaces.config", "r");
   if(!arquivo) die("Não foi possível abrir o arquivo de enlaces\n");
@@ -84,18 +80,15 @@ void configurarEnlace(int id,
       r1 = id;
     }
     if(r1 == id){
-      neigh_list[roteador[id].qtdVizinhos++] = r2;
+      listaVizinhos[infoRoteador->qtdVizinhos++] = r2;
       infoVizinhos[r2].id = r2;
       infoVizinhos[r2].custo = infoVizinhos[r2].custoOriginal = dist;
-      //neigh_info[r2].id = r2;
-      //neigh_info[r2].cost = neigh_info[r2].orig_cost = dist;
     }
   }
   fclose(arquivo);
 }
 
-void configurarRoteadores(informacoesRoteador_t *infoRoteador, 
-                          roteador_t roteador[],
+void configurarRoteadores(informacoesRoteador_t *infoRoteador,
                           roteadorVizinho_t infoVizinhos[NROUT]){
   int id = infoRoteador->id;
   int novoID, novaPorta;
@@ -105,31 +98,27 @@ void configurarRoteadores(informacoesRoteador_t *infoRoteador,
   while(fscanf(arquivo, "%d %d %s\n", &novoID, &novaPorta, novoIP) != EOF){
     if(novoID == id){
       infoRoteador->porta = novaPorta;
-      roteador[id].porta = novaPorta;
-      strcpy(roteador[id].ip, novoIP);
       strcpy(infoRoteador->ip, novoIP);
     }
     if(infoVizinhos[novoID].id != -1){
       infoVizinhos[novoID].porta = novaPorta;
       strcpy(infoVizinhos[novoID].ip, novoIP);
-      //neigh_info[novoID].port = novaPorta;
-      //strcpy(neigh_info[novoID].adress, novoIP);
     }
   }
   fclose(arquivo);
 }
 
 //Imprime informações sobre o roteador
-void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
+void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int listaVizinhos[NROUT],
     roteadorVizinho_t infoVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT]){
   int i;
 
   printf("O nó %d, está conectado à porta %d, Seu endereço é %s\n\n", id, port, adress);
   printf("Seus vizinhos são:\n");
   for(i = 0; i < neigh_qtty; i++)
-    printf("O roteador %d, com enlace de custo %d, na porta %d, e endereço %s\n", neigh_list[i],
-    infoVizinhos[neigh_list[i]].custo, infoVizinhos[neigh_list[i]].porta, infoVizinhos[neigh_list[i]].ip);  
-    //neigh_info[neigh_list[i]].cost, neigh_info[neigh_list[i]].port, neigh_info[neigh_list[i]].adress);
+    printf("O roteador %d, com enlace de custo %d, na porta %d, e endereço %s\n", listaVizinhos[i],
+    infoVizinhos[listaVizinhos[i]].custo, infoVizinhos[listaVizinhos[i]].porta, infoVizinhos[listaVizinhos[i]].ip);  
+    //neigh_info[listaVizinhos[i]].cost, neigh_info[listaVizinhos[i]].port, neigh_info[listaVizinhos[i]].adress);
   printf("\n");
 
   printf("Essa é sua tabela de roteamento, atualmente:\n");
@@ -153,7 +142,7 @@ void copy_package(pacote_t *a, pacote_t *b){
 //Enfilera um pacote para cada vizinho do nó, contendo seu vetor de distancia
 void queue_dist_vec(
                       filaPacotes_t *saida,
-                      int neigh_list[NROUT],
+                      int listaVizinhos[NROUT],
                       distSalto_t tabelaRoteamento[NROUT][NROUT],
                       int id,
                       int neigh_qtty
@@ -165,7 +154,7 @@ void queue_dist_vec(
     pacote_t *pck = &(saida->filaPacotes[saida->fim]);
     pck->controle = 1;
     pck->origem = id;
-    pck->destino = neigh_list[i];
+    pck->destino = listaVizinhos[i];
     //printf("Enfileirando pacote de vetor de distancia para o destino %d\n", pck->dist);
     //printf("Vetor de distancia enviado: ");
     for(j = 0; j < NROUT; j++){

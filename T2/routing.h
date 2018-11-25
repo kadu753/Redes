@@ -26,6 +26,11 @@ pthread_t receiver_id;
 pthread_t unpacker_id;
 pthread_t refresher_id;
 pthread_t pulse_checker_id;
+pthread_mutex_t log_mutex;
+pthread_mutex_t messages_mutex;
+pthread_mutex_t news_mutex;
+
+FILE *logs, *messages;
 
 //Estrutura de vizinho
 typedef struct{
@@ -37,12 +42,14 @@ typedef struct{
   char ip[TAM_IP];
 } roteadorVizinho_t;
 
+/*
 typedef struct{
   int id;
   int porta;
   int qtdVizinhos;
   char ip[TAM_IP];
 } roteador_t;
+*/
 
 //Estrutura de distância, para o vetor de distâncias
 typedef struct{
@@ -80,8 +87,7 @@ int toint(char *str);
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[NROUT],
                 distSalto_t tabelaRoteamento[NROUT][NROUT],
-                int neigh_list[NROUT],
-                roteador_t roteador[],
+                int listaVizinhos[NROUT],
                 filaPacotes_t *entrada,
                 filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
@@ -90,18 +96,16 @@ void inicializar(informacoesRoteador_t *infoRoteador,
                 struct sockaddr_in *si_me);
           
 void configurarRoteadores(informacoesRoteador_t *infoRoteador,
-                          roteador_t roteador[],
                           roteadorVizinho_t infoVizinhos[NROUT]);
 
-void configurarEnlace(int id, 
-                      int neigh_list[NROUT], 
-                      roteador_t roteador[], 
+void configurarEnlace(informacoesRoteador_t *infoRoteador,
+                      int listaVizinhos[NROUT],
                       roteadorVizinho_t infoVizinhos[NROUT]);
 
-void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int neigh_list[NROUT],
+void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int listaVizinhos[NROUT],
                 roteadorVizinho_t infoVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT]);
 void copy_package(pacote_t *a, pacote_t *b);
-void queue_dist_vec(filaPacotes_t *saida, int neigh_list[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT],
+void queue_dist_vec(filaPacotes_t *saida, int listaVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT],
                     int id, int neigh_qtty);
 void print_pack_queue(filaPacotes_t *filaPacotes);
 void print_rout_table(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *file, int infile);

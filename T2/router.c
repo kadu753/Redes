@@ -1,22 +1,12 @@
 #include "routing.h"
 
-roteador_t roteador[NROUT];
+//roteador_t roteador[NROUT];
 informacoesRoteador_t infoRoteador;
 roteadorVizinho_t infoVizinhos[NROUT];
 distSalto_t tabelaRoteamento[NROUT][NROUT]; //Tabela de roteamento do nó
 filaPacotes_t entrada, saida; //Filas de entrada e saida de pacotes
-
-
-
-
-
-
-
-
-int neigh_list[NROUT]; //Lista de vizinhos do roteador
+int listaVizinhos[NROUT]; //Lista de vizinhos do roteador
 int slen = sizeof(si_me); //Tamanho do endereço
-pthread_mutex_t log_mutex, messages_mutex, news_mutex;
-FILE *logs, *messages;
 
 
 int main(int argc, char *argv[]){
@@ -49,14 +39,14 @@ int main(int argc, char *argv[]){
   if (!(messages = fopen(message_path, "w+"))) die("Falha ao criar arquivo de mensagens");
 
   //Rotina de inicializacao do roteador
-  inicializar(&infoRoteador, infoVizinhos, tabelaRoteamento, neigh_list, roteador, &entrada, &saida, &log_mutex, &messages_mutex, &news_mutex, &si_me);
+  inicializar(&infoRoteador, infoVizinhos, tabelaRoteamento, listaVizinhos, &entrada, &saida, &log_mutex, &messages_mutex, &news_mutex, &si_me);
 
   if((infoRoteador.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
     die("Não foi possível criar o Socket!");
   }
   memset((char*) &si_me, 0, sizeof(si_me));
   si_me.sin_family = AF_INET;
-  si_me.sin_port = htons(roteador[infoRoteador.id].porta);
+  si_me.sin_port = htons(infoRoteador.porta);
   si_me.sin_addr.s_addr = htonl(INADDR_ANY);
 
   if(bind(infoRoteador.sock, (struct sockaddr*) &si_me, sizeof(si_me)) == -1)
@@ -86,7 +76,7 @@ int main(int argc, char *argv[]){
     }
 
     if (menu_option == 1){
-      info(infoRoteador.id, infoRoteador.porta, infoRoteador.ip, infoRoteador.qtdVizinhos, neigh_list, infoVizinhos, tabelaRoteamento);
+      info(infoRoteador.id, infoRoteador.porta, infoRoteador.ip, infoRoteador.qtdVizinhos, listaVizinhos, infoVizinhos, tabelaRoteamento);
       menu_option = back_option_menu(1);
       continue;
     }
@@ -242,7 +232,7 @@ void* unpacker(void *nothing){
           if (retransmit){
             pthread_mutex_lock(&log_mutex);
             fprintf(logs, "[UNPACKER] O vetor de distancias mudou, enfileirando atualização pros vizinhos.\n");
-            queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
+            queue_dist_vec(&saida, listaVizinhos, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
             pthread_mutex_unlock(&log_mutex);
           }
         }
@@ -301,7 +291,7 @@ void *refresher(void *nothing){
     if (!CLEAR_LOG) {
       fprintf(logs, "[REFRESHER] Enfileirando atualizações de vetor de distância\n");
     }
-    queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
+    queue_dist_vec(&saida, listaVizinhos, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
     sleep(REFRESH_TIME);
   }
 }
@@ -321,7 +311,7 @@ void* pulse_checker(void *nothing){
     pthread_mutex_lock(&news_mutex);
     for(i = 0; i < infoRoteador.qtdVizinhos; i++){
       recalculate = 0;
-      neigh = neigh_list[i];
+      neigh = listaVizinhos[i];
       if (infoVizinhos[neigh].novidade){
         infoVizinhos[neigh].novidade = 0;
         if (infoVizinhos[neigh].custo == INF){
@@ -362,7 +352,7 @@ void* pulse_checker(void *nothing){
     }
     pthread_mutex_unlock(&news_mutex);
     if (recalculate) {
-      queue_dist_vec(&saida, neigh_list, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
+      queue_dist_vec(&saida, listaVizinhos, tabelaRoteamento, infoRoteador.id, infoRoteador.qtdVizinhos);
     }
   }
 }
