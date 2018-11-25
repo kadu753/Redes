@@ -82,6 +82,8 @@ typedef struct{
   pthread_mutex_t mutex;
 }filaPacotes_t;
 
+void menu(informacoesRoteador_t infoRoteador);
+void enviarMensagem(pacote_t auxEnviar, informacoesRoteador_t infoRoteador);
 void die(char* msg);
 int toint(char *str);
 void inicializar(informacoesRoteador_t *infoRoteador,

@@ -1,20 +1,5 @@
 #include "routing.h"
 
-//Funcao para imprimir mensagens de erro e encerrar o programa
-void die(char* msg){
-  printf("%s\n", msg);
-  exit(1);
-};
-
-//Funcao para converter uma string para inteiro
-int toint(char *str){
-  int i, pot, ans;
-  ans = 0;
-  for(i = strlen(str) - 1, pot = 1; i >= 0; i--, pot *= 10)
-    ans += pot * (str[i] - '0');
-  return ans;
-}
-
 //Função com rotina de inicialização dos roteadores
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[NROUT],
@@ -228,4 +213,32 @@ void print_file(FILE *file, pthread_mutex_t *mutex){
   }
   fseek(file, 0, SEEK_END);
   pthread_mutex_unlock(mutex);
+}
+
+void menu(informacoesRoteador_t infoRoteador){
+  system("clear");
+  printf(" ____________________________________________________________\n");
+  printf("|%s%d%17s%d%12s%-15s|\n", "Roteador: ", infoRoteador.id, "Porta: ", infoRoteador.porta, "IP: ", infoRoteador.ip);
+  printf("|------------------------------------------------------------|\n");
+  printf("|%-60s|\n", "1 - Mandar mensagem");
+  printf("|%-60s|\n", "2 - Ler Mensagens");
+  printf("|%-60s|\n", "3 - log");
+  printf("|%-60s|\n", "4 - info");
+  printf("|%-60s|\n", "0 - Sair");
+  printf("|____________________________________________________________|\n\n");
+}
+
+//Funcao para imprimir mensagens de erro e encerrar o programa
+void die(char* msg){
+  printf("%s\n", msg);
+  exit(1);
+};
+
+//Funcao para converter uma string para inteiro
+int toint(char *str){
+  int i, pot, ans;
+  ans = 0;
+  for(i = strlen(str) - 1, pot = 1; i >= 0; i--, pot *= 10)
+    ans += pot * (str[i] - '0');
+  return ans;
 }
