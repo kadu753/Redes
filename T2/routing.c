@@ -2,23 +2,23 @@
 
 //Função com rotina de inicialização dos roteadores
 void inicializar(informacoesRoteador_t *infoRoteador,
-                roteadorVizinho_t infoVizinhos[NROUT],
-                distSalto_t tabelaRoteamento[NROUT][NROUT],
-                int listaVizinhos[NROUT],
+                roteadorVizinho_t infoVizinhos[N_ROTEADORES],
+                distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES],
+                int listaVizinhos[N_ROTEADORES],
                 filaPacotes_t *entrada,
                 filaPacotes_t *saida,
-                pthread_mutex_t *log_mutex,
-                pthread_mutex_t *messages_mutex,
-                pthread_mutex_t *news_mutex){
+                pthread_mutex_t *logMutex,
+                pthread_mutex_t *mensagemMutex,
+                pthread_mutex_t *novidadeMutex){
   int i, j, auxLista;
   int id = infoRoteador->id;
 
   //Inicializa o vetor de informações de vizinhos e a tabela de roteamento
-  for(i = 0; i < NROUT; i++){
+  for(i = 0; i < N_ROTEADORES; i++){
     infoVizinhos[i].novidade = 0;
     infoVizinhos[i].id = infoVizinhos[i].porta = -1;
     infoVizinhos[i].custo = INF;
-    for(j = 0; j < NROUT; j++){
+    for(j = 0; j < N_ROTEADORES; j++){
       tabelaRoteamento[i][j].distancia = INF;
       tabelaRoteamento[i][j].proxSalto = -1;
     }
@@ -37,8 +37,6 @@ void inicializar(informacoesRoteador_t *infoRoteador,
     tabelaRoteamento[id][auxLista].distancia = infoVizinhos[auxLista].custo;
     tabelaRoteamento[id][auxLista].proxSalto = infoVizinhos[auxLista].id;
   }
-  
-  //infoRoteador->qtdVizinhos = roteador[id].qtdVizinhos;
 
   //Inicializa as filas de entrada e saida
   entrada->inicio = saida->inicio = entrada->fim = saida->fim = 0;
@@ -46,14 +44,14 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   pthread_mutex_init(&(saida->mutex), NULL);
 
   //Inicializa mutex dos arquivos de log e mensagens e de checagem de queda de nó
-  pthread_mutex_init(log_mutex, NULL);
-  pthread_mutex_init(messages_mutex, NULL);
-  pthread_mutex_init(news_mutex, NULL);
+  pthread_mutex_init(logMutex, NULL);
+  pthread_mutex_init(mensagemMutex, NULL);
+  pthread_mutex_init(novidadeMutex, NULL);
 }
 
 void configurarEnlace(informacoesRoteador_t *infoRoteador,
-                      int listaVizinhos[NROUT],
-                      roteadorVizinho_t infoVizinhos[NROUT]){
+                      int listaVizinhos[N_ROTEADORES],
+                      roteadorVizinho_t infoVizinhos[N_ROTEADORES]){
   int id = infoRoteador->id;
   int r1, r2, dist;
   FILE *arquivo = fopen("enlaces.config", "r");
@@ -73,7 +71,7 @@ void configurarEnlace(informacoesRoteador_t *infoRoteador,
 }
 
 void configurarRoteadores(informacoesRoteador_t *infoRoteador,
-                          roteadorVizinho_t infoVizinhos[NROUT]){
+                          roteadorVizinho_t infoVizinhos[N_ROTEADORES]){
   int id = infoRoteador->id;
   int novoID, novaPorta;
   char novoIP[TAM_IP];
@@ -92,79 +90,49 @@ void configurarRoteadores(informacoesRoteador_t *infoRoteador,
   fclose(arquivo);
 }
 
-//Imprime informações sobre o roteador
-void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int listaVizinhos[NROUT],
-    roteadorVizinho_t infoVizinhos[NROUT], distSalto_t tabelaRoteamento[NROUT][NROUT]){
-  int i;
-
-  printf("O nó %d, está conectado à porta %d, Seu endereço é %s\n\n", id, port, adress);
-  printf("Seus vizinhos são:\n");
-  for(i = 0; i < neigh_qtty; i++)
-    printf("O roteador %d, com enlace de custo %d, na porta %d, e endereço %s\n", listaVizinhos[i],
-    infoVizinhos[listaVizinhos[i]].custo, infoVizinhos[listaVizinhos[i]].porta, infoVizinhos[listaVizinhos[i]].ip);  
-    //neigh_info[listaVizinhos[i]].cost, neigh_info[listaVizinhos[i]].port, neigh_info[listaVizinhos[i]].adress);
-  printf("\n");
-
-  printf("Essa é sua tabela de roteamento, atualmente:\n");
-  printRoteamento(tabelaRoteamento, NULL);
-}
-
-//Copia o pacote a para o pacote b
-void copy_package(pacote_t *a, pacote_t *b){
-  int i;
-
-  b->controle = a->controle;
-  b->destino = a->destino;
-  b->origem = a->origem;
-  strcpy(b->mensagem, a->mensagem);
-  for(i = 0; i < NROUT; i++){
-    b->vetorDistancia[i].distancia = a->vetorDistancia[i].distancia;
-    b->vetorDistancia[i].proxSalto = a->vetorDistancia[i].proxSalto;
+void duplicarPacote(pacote_t *original, pacote_t *copia){
+  copia->controle = original->controle;
+  copia->origem = original->origem;
+  copia->destino = original->destino;
+  strcpy(copia->mensagem, original->mensagem);
+  for(int i = 0; i < N_ROTEADORES; i++){
+    copia->vetorDistancia[i].distancia = original->vetorDistancia[i].distancia;
+    copia->vetorDistancia[i].proxSalto = original->vetorDistancia[i].proxSalto;
   }
 }
 
-//Enfilera um pacote para cada vizinho do nó, contendo seu vetor de distancia
-void queue_dist_vec(
-                      filaPacotes_t *saida,
-                      int listaVizinhos[NROUT],
-                      distSalto_t tabelaRoteamento[NROUT][NROUT],
-                      int id,
-                      int neigh_qtty
-                    ) {
-  int i, j;
-
+void enfileirarPacote(filaPacotes_t *saida, distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], 
+                      informacoesRoteador_t infoRoteador, int listaVizinhos[N_ROTEADORES]){
   pthread_mutex_lock(&(saida->mutex));
-  for(i = 0; i < neigh_qtty; i++, saida->fim++){
-    pacote_t *pck = &(saida->filaPacotes[saida->fim]);
-    pck->controle = 1;
-    pck->origem = id;
-    pck->destino = listaVizinhos[i];
-    //printf("Enfileirando pacote de vetor de distancia para o destino %d\n", pck->dist);
-    //printf("Vetor de distancia enviado: ");
-    for(j = 0; j < NROUT; j++){
-      pck->vetorDistancia[j].distancia = tabelaRoteamento[id][j].distancia;
-      pck->vetorDistancia[j].proxSalto = tabelaRoteamento[id][j].proxSalto;
-      //printf("(%d,%d) ", pck->vetorDistancia[j].distancia, pck->vetorDistancia[j].proxSalto);
+  for(int i = 0; i < infoRoteador.qtdVizinhos; i++, saida->fim++){
+    pacote_t *auxPacote = &(saida->filaPacotes[saida->fim]);
+    auxPacote->controle = 1;
+    auxPacote->origem = infoRoteador.id;
+    auxPacote->destino = listaVizinhos[i];
+    for(int j = 0; j < N_ROTEADORES; j++){
+      auxPacote->vetorDistancia[j].distancia = tabelaRoteamento[infoRoteador.id][j].distancia;
+      auxPacote->vetorDistancia[j].proxSalto = tabelaRoteamento[infoRoteador.id][j].proxSalto;
     }
   }
   pthread_mutex_unlock(&(saida->mutex));
 }
 
-void printRoteamento(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *arquivo){
+void printRoteamento(distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], FILE *arquivo){
   if(arquivo){
     fprintf(arquivo, " ________________________________________________\n");
+    timeStamp();
     fprintf(arquivo, "|%35s%14s\n", "TABELA DE ROTEAMENTO", "|");
     fprintf(arquivo, "|------------------------------------------------|\n");
-    for(int i = 0; i < NROUT; i++){
+    for(int i = 0; i < N_ROTEADORES; i++){
       if(i == 0){
         fprintf(arquivo, "|        |");
       }
       fprintf(arquivo, "|%4d%5s", i, "|");
     }
     fprintf(arquivo, "\n");
-    for(int i = 0; i < NROUT; i++){
+    for(int i = 0; i < N_ROTEADORES; i++){
       fprintf(arquivo, "|%4d%5s", i, "|");
-      for(int j = 0; j < NROUT; j++){
+      for(int j = 0; j < N_ROTEADORES; j++){
         if(tabelaRoteamento[i][j].distancia != INF){
           fprintf(arquivo, "|%3d[%d]%3s", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto, "|");
         } else {
@@ -178,16 +146,16 @@ void printRoteamento(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *arquivo){
     printf(" ________________________________________________\n");
     printf("|%35s%14s\n", "TABELA DE ROTEAMENTO", "|");
     printf("|------------------------------------------------|\n");
-    for(int i = 0; i < NROUT; i++){
+    for(int i = 0; i < N_ROTEADORES; i++){
       if(i == 0){
         printf("|        |");
       }
       printf("|%4d%5s", i, "|");
     }
     printf("\n");
-    for(int i = 0; i < NROUT; i++){
+    for(int i = 0; i < N_ROTEADORES; i++){
       printf("|%4d%5s", i, "|");
-      for(int j = 0; j < NROUT; j++){
+      for(int j = 0; j < N_ROTEADORES; j++){
         if(tabelaRoteamento[i][j].distancia != INF){
           printf("|%3d[%d]%3s", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto, "|");
         } else {
@@ -200,14 +168,14 @@ void printRoteamento(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *arquivo){
   }
 }
 
-void print_file(FILE *file, pthread_mutex_t *mutex){
+void printarArquivo(FILE *arquivo, pthread_mutex_t *mutex){
   char str[100];
   pthread_mutex_lock(mutex);
-  fseek(file, 0, SEEK_SET);
-  while(fgets(str, 100, file)){
+  fseek(arquivo, 0, SEEK_SET);
+  while(fgets(str, 100, arquivo)){
     printf("%s", str);
   }
-  fseek(file, 0, SEEK_END);
+  fseek(arquivo, 0, SEEK_END);
   pthread_mutex_unlock(mutex);
 }
 
@@ -222,6 +190,20 @@ void menu(informacoesRoteador_t infoRoteador){
   printf("|%-60s|\n", "4 - info");
   printf("|%-60s|\n", "0 - Sair");
   printf("|____________________________________________________________|\n\n");
+}
+
+void timeStamp(){
+  time_t     now;
+  struct tm  ts;
+  char       buf[80];
+  
+  // Get current time
+  time(&now);
+
+  // Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
+  ts = *localtime(&now);
+  strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S %Z", &ts);
+  fprintf(logs, "|%38s%12s", buf, "|\n");
 }
 
 //Funcao para imprimir mensagens de erro e encerrar o programa
