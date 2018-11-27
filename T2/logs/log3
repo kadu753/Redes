@@ -1,0 +1,61 @@
+Enviar foi iniciado
+Desempacotador foi iniciado
+Receber iniciado!
+ ________________________________________________
+|               TABELA DE ROTEAMENTO             |
+|------------------------------------------------|
+|        ||   0    ||   1    ||   2    ||   3    |
+|   0    ||   -    ||   -    ||   -    ||   -    |
+|   1    ||   -    ||   -    ||   -    ||   -    |
+|   2    ||  2[0]  ||  2[1]  ||  0[2]  ||  2[3]  |
+|   3    ||  4[2]  ||  4[2]  ||  2[2]  ||  0[3]  |
+|________________________________________________|
+O vetor de distancia  mudou no desempacotador
+Pacote recebido de #0
+Desempacotando pacote de 0
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!
+Falha no recebimento do pacote!

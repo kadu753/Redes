@@ -10,20 +10,18 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define CLEAR_LOG 1 //1 para ocultar informações sobre pacotes de controle
 #define REFRESH_TIME 2//Tempo entre os envios periodicos de vetor de distancia aos vizinhos
-#define TOLERANCY 2 * REFRESH_TIME //Tempo até o roteador assumir que o vizinho caiu
 #define MAX_QUEUE 1123456 //Tamanho máximo da fila =~ 1123456
 #define MAX_MESSAGE 200 //Tamanho maximo da mensagem
 #define TAM_IP 30 //Tamanho máximo de um endereço
 #define NROUT 4 //Numero de Roteadores
 #define INF 112345678 //Infinito =~ 10^8
 
-struct sockaddr_in si_me;
+struct sockaddr_in socketRoteador;
 
-pthread_t sender_id;
-pthread_t receiver_id;
-pthread_t unpacker_id;
+pthread_t threadEnviar;
+pthread_t threadReceber;
+pthread_t threadDesempacotar;
 pthread_t refresher_id;
 pthread_t pulse_checker_id;
 pthread_mutex_t log_mutex;
@@ -41,15 +39,6 @@ typedef struct{
   int novidade;
   char ip[TAM_IP];
 } roteadorVizinho_t;
-
-/*
-typedef struct{
-  int id;
-  int porta;
-  int qtdVizinhos;
-  char ip[TAM_IP];
-} roteador_t;
-*/
 
 //Estrutura de distância, para o vetor de distâncias
 typedef struct{
@@ -83,7 +72,7 @@ typedef struct{
 }filaPacotes_t;
 
 void menu(informacoesRoteador_t infoRoteador);
-void enviarMensagem(pacote_t auxEnviar, informacoesRoteador_t infoRoteador);
+void enviarMensagem(informacoesRoteador_t infoRoteador);
 void die(char* msg);
 int toint(char *str);
 void inicializar(informacoesRoteador_t *infoRoteador,
@@ -94,8 +83,7 @@ void inicializar(informacoesRoteador_t *infoRoteador,
                 filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
-                pthread_mutex_t *news_mutex,
-                struct sockaddr_in *si_me);
+                pthread_mutex_t *news_mutex);
           
 void configurarRoteadores(informacoesRoteador_t *infoRoteador,
                           roteadorVizinho_t infoVizinhos[NROUT]);
@@ -112,11 +100,11 @@ void queue_dist_vec(filaPacotes_t *saida, int listaVizinhos[NROUT], distSalto_t 
 void print_pack_queue(filaPacotes_t *filaPacotes);
 void print_rout_table(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *file, int infile);
 void print_file(FILE *file, pthread_mutex_t *mutex);
-void* sender(void *nothing); //Thread responsavel por enviar pacotes
-void* receiver(void *nothing); //Thread responsavel por receber pacotes
-void* unpacker(void *nothing); //Thread responsavel por desembrulhar pacotes e trata-los
+void* enviar(void *nothing); //Thread responsavel por enviar pacotes
+void* desempacotador(void *nothing);
+void* receber(void *nothing);
 void* refresher(void *nothing); //Thread responsavel por enfileirar periodicamente pacotes de distancia para todos os vizinhos
-void* pulse_checker(void *nothing); //Thread responsavel por verificar se os nós vizinhos estão vivos
 int back_option_menu(int fallback_option); // Função auxiliar do menu. Retorna -1 caso o usuário deseje voltar ou +fallback_option+ caso o usuário queira atualizar
+void printRoteamento(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *arquivo);
 
 #endif

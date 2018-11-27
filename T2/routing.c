@@ -9,8 +9,7 @@ void inicializar(informacoesRoteador_t *infoRoteador,
                 filaPacotes_t *saida,
                 pthread_mutex_t *log_mutex,
                 pthread_mutex_t *messages_mutex,
-                pthread_mutex_t *news_mutex,
-                struct sockaddr_in *si_me){
+                pthread_mutex_t *news_mutex){
   int i, j, auxLista;
   int id = infoRoteador->id;
 
@@ -107,7 +106,7 @@ void info(int id, int port, char adress[TAM_IP], int neigh_qtty, int listaVizinh
   printf("\n");
 
   printf("Essa é sua tabela de roteamento, atualmente:\n");
-  print_rout_table(tabelaRoteamento, NULL, 0);
+  printRoteamento(tabelaRoteamento, NULL);
 }
 
 //Copia o pacote a para o pacote b
@@ -151,56 +150,53 @@ void queue_dist_vec(
   pthread_mutex_unlock(&(saida->mutex));
 }
 
-//Funcao que imprime tudo que está numa fila
-void print_pack_queue(filaPacotes_t *filaPacotes){
-  int i, j;
-  pacote_t *pck;
-
-  pthread_mutex_lock(&(filaPacotes->mutex));
-  printf("%d Pacotes nessa fila:\n", filaPacotes->fim - filaPacotes->inicio);
-  for(i = filaPacotes->inicio; i < filaPacotes->fim; i++){
-    pck = &(filaPacotes->filaPacotes[i]);
-    printf("\nPacote %s de controle, Destino: %d, Origem: %d\n", pck->controle ? "é" : "não é", pck->destino, pck->origem);
-    if (pck->controle){
-      printf("Vetor de distância do pacote: ");
-      for(j = 0; j < NROUT; j++){
-        printf("(%d,%d), ", pck->vetorDistancia[j].distancia, pck->vetorDistancia[j].proxSalto);
+void printRoteamento(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *arquivo){
+  if(arquivo){
+    fprintf(arquivo, " ________________________________________________\n");
+    fprintf(arquivo, "|%35s%14s\n", "TABELA DE ROTEAMENTO", "|");
+    fprintf(arquivo, "|------------------------------------------------|\n");
+    for(int i = 0; i < NROUT; i++){
+      if(i == 0){
+        fprintf(arquivo, "|        |");
+      }
+      fprintf(arquivo, "|%4d%5s", i, "|");
+    }
+    fprintf(arquivo, "\n");
+    for(int i = 0; i < NROUT; i++){
+      fprintf(arquivo, "|%4d%5s", i, "|");
+      for(int j = 0; j < NROUT; j++){
+        if(tabelaRoteamento[i][j].distancia != INF){
+          fprintf(arquivo, "|%3d[%d]%3s", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto, "|");
+        } else {
+          fprintf(arquivo, "|%4s%5s", "-", "|");
+        }
+      }
+      fprintf(arquivo, "\n");
+    }
+    fprintf(arquivo, "|________________________________________________|\n");
+  } else {
+    printf(" ________________________________________________\n");
+    printf("|%35s%14s\n", "TABELA DE ROTEAMENTO", "|");
+    printf("|------------------------------------------------|\n");
+    for(int i = 0; i < NROUT; i++){
+      if(i == 0){
+        printf("|        |");
+      }
+      printf("|%4d%5s", i, "|");
+    }
+    printf("\n");
+    for(int i = 0; i < NROUT; i++){
+      printf("|%4d%5s", i, "|");
+      for(int j = 0; j < NROUT; j++){
+        if(tabelaRoteamento[i][j].distancia != INF){
+          printf("|%3d[%d]%3s", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto, "|");
+        } else {
+          printf("|%4s%5s", "-", "|");
+        }
       }
       printf("\n");
     }
-    else printf("Mensagem do pacote: %s\n", pck->mensagem);
-  }
-  printf("\n");
-  pthread_mutex_unlock(&(filaPacotes->mutex));
-}
-
-//Funcao que imprime a tabela de roteamento
-void print_rout_table(distSalto_t tabelaRoteamento[NROUT][NROUT], FILE *file, int infile){
-  int i, j;
-
-  if (infile) fprintf(file, "   ");
-  else printf("   ");
-  for(i = 0; i < NROUT; i++){
-    if (infile) fprintf(file, "  %d %s|",i, i > 0 ? " " : "");
-    else printf("  %d %s|",i, i > 0 ? " " : "");
-  }
-  if (file) fprintf(file, "\n");
-  else printf("\n");
-  for(i = 0; i < NROUT; i++){
-    if (file) fprintf(file, "%d |", i);
-    else printf("%d |", i);
-    for(j = 0; j < NROUT; j++){
-      if (infile){
-        if (tabelaRoteamento[i][j].distancia != INF) fprintf(file, "%d(%d)| ", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto);
-        else fprintf(file, "I(X)| ");
-      }
-      else{
-        if (tabelaRoteamento[i][j].distancia != INF) printf("%d(%d)| ", tabelaRoteamento[i][j].distancia, tabelaRoteamento[i][j].proxSalto);
-        else printf("I(X)| ");
-      }
-    }
-    if (file) fprintf(file, "\n");
-    else printf("\n");
+    printf("|________________________________________________|\n");
   }
 }
 
