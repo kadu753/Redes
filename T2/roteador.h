@@ -11,7 +11,7 @@
 #include <pthread.h>
 
 #define TEMPO_CHECAR_REDE 2
-#define TAM_FILA 12345678
+#define TAM_FILA 1123456
 #define TAM_MENSAGEM 100
 #define TAM_IP 30
 #define N_ROTEADORES 4
