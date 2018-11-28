@@ -16,13 +16,15 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   //Inicializa o vetor de informações de vizinhos e a tabela de roteamento
   for(i = 0; i < N_ROTEADORES; i++){
     infoVizinhos[i].novidade = 0;
-    infoVizinhos[i].id = infoVizinhos[i].porta = -1;
+    infoVizinhos[i].id = infoVizinhos[i].porta = infoVizinhos[i].saltoOriginal = -1;
     infoVizinhos[i].custo = INF;
     for(j = 0; j < N_ROTEADORES; j++){
       tabelaRoteamento[i][j].distancia = INF;
       tabelaRoteamento[i][j].proxSalto = -1;
     }
   }
+
+  infoVizinhos[id].saltoOriginal = id;
 
   configurarEnlace(infoRoteador, listaVizinhos, infoVizinhos);
   configurarRoteadores(infoRoteador, infoVizinhos);
@@ -63,7 +65,7 @@ void configurarEnlace(informacoesRoteador_t *infoRoteador,
     }
     if(r1 == id){
       listaVizinhos[infoRoteador->qtdVizinhos++] = r2;
-      infoVizinhos[r2].id = r2;
+      infoVizinhos[r2].id = infoVizinhos[r2].saltoOriginal = r2;
       infoVizinhos[r2].custo = infoVizinhos[r2].custoOriginal = dist;
     }
   }
@@ -115,6 +117,29 @@ void enfileirarPacote(filaPacotes_t *saida, distSalto_t tabelaRoteamento[N_ROTEA
     }
   }
   pthread_mutex_unlock(&(saida->mutex));
+}
+
+void recalcular(int vizinho, distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], roteadorVizinho_t infoVizinhos[N_ROTEADORES], informacoesRoteador_t infoRoteador){
+  pthread_mutex_lock(&logMutex);
+  fprintf(logs, "Calculando novo vetor de distancia...\n");
+  pthread_mutex_unlock(&logMutex);
+  for(int i = 0; i < N_ROTEADORES; i++){
+    for(int j = 0; j < N_ROTEADORES; j++){
+      if(i == infoRoteador.id){
+        if(infoVizinhos[j].saltoOriginal == -1){
+          tabelaRoteamento[i][j].distancia = INF;
+          tabelaRoteamento[i][j].proxSalto = -1;
+        } else {
+          tabelaRoteamento[i][j].distancia = infoVizinhos[j].custoOriginal;
+          tabelaRoteamento[i][j].proxSalto = infoVizinhos[j].saltoOriginal;
+        }
+      } else {
+        tabelaRoteamento[i][j].distancia = INF;
+        tabelaRoteamento[i][j].proxSalto = -1;
+      }
+    }
+  }
+  printRoteamento(tabelaRoteamento, NULL);
 }
 
 void printRoteamento(distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], FILE *arquivo){
@@ -186,8 +211,8 @@ void menu(informacoesRoteador_t infoRoteador){
   printf("|------------------------------------------------------------|\n");
   printf("|%-60s|\n", "1 - Mandar mensagem");
   printf("|%-60s|\n", "2 - Ler Mensagens");
-  printf("|%-60s|\n", "3 - log");
-  printf("|%-60s|\n", "4 - info");
+  printf("|%-60s|\n", "3 - Log");
+  printf("|%-60s|\n", "4 - Tabela de Roteamento");
   printf("|%-60s|\n", "0 - Sair");
   printf("|____________________________________________________________|\n\n");
 }

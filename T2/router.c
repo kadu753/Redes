@@ -52,6 +52,7 @@ int main(int argc, char *argv[]){
 	pthread_create(&threadReceber, NULL, receber, NULL); //Cria thread receptora
 	pthread_create(&threadDesempacotar, NULL, desempacotador, NULL); //Cria thread desempacotadora
 	pthread_create(&threadInformacao, NULL, trocarInformacao, NULL); //Cria thread atualizadora
+	pthread_create(&threadVivacidade, NULL, checarVivacidade, NULL);
 
 	while(1){
 		switch(opcoes){
@@ -130,7 +131,7 @@ void enviarMensagem(informacoesRoteador_t infoRoteador){
 				pthread_mutex_lock(&saida.mutex);
 				duplicarPacote(&auxPacote, &saida.filaPacotes[saida.fim++]);
 				pthread_mutex_unlock(&saida.mutex);
-				printf("Mensagem enviada!\n");
+				//printf("Mensagem enviada para o roteador #%d!\n", auxPacote.destino);
 				sleep(2);
 				break;
 			}else{
@@ -142,7 +143,7 @@ void enviarMensagem(informacoesRoteador_t infoRoteador){
 	}
 }
 
-void* enviar(void *nothing){
+void* enviar(void *info){
 	int auxDestino;
 	pacote_t *auxEnviar;
 
@@ -162,7 +163,7 @@ void* enviar(void *nothing){
 			}else{
 				if(sendto(infoRoteador.sock, auxEnviar, sizeof(*auxEnviar), 0, (struct sockaddr*) &socketRoteador, slen) == -1){
 					pthread_mutex_lock(&logMutex);
-					fprintf(logs, "Enviar - Falha no envio do pacote\n");
+					//fprintf(logs, "Enviar - Falha no envio do pacote\n");
 					pthread_mutex_unlock(&logMutex);
 				}else{
 					if(!auxEnviar->controle){
@@ -178,7 +179,7 @@ void* enviar(void *nothing){
 	}
 }
 
-void* desempacotador(void *nothing){
+void* desempacotador(void *info){
 
 	int tabelaAtualizada = 0, vetorAtualizado = 0;
 	pacote_t *auxDesempacotar;
@@ -241,7 +242,7 @@ void* desempacotador(void *nothing){
 	}
 }
 
-void* receber(void *nothing){
+void* receber(void *info){
 	pacote_t auxReceber;
 
 	pthread_mutex_lock(&logMutex);
@@ -267,9 +268,40 @@ void* receber(void *nothing){
 	}
 }
 
-void *trocarInformacao(void *nothing){
+void *trocarInformacao(void *info){
 	while(1){
 		enfileirarPacote(&saida, tabelaRoteamento, infoRoteador, listaVizinhos);
-		sleep(REFRESH_TIME);
+		sleep(TEMPO_CHECAR_REDE);
+	}
+}
+
+void *checarVivacidade(void *info){
+	int vizinho, precisaRecalcular = 0;
+
+	while(1){
+		sleep(TEMPO_CHECAR_REDE * 2);
+		pthread_mutex_lock(&novidadeMutex);
+		precisaRecalcular = 0;
+		for(int i = 0; i < infoRoteador.qtdVizinhos; i++){
+			vizinho = listaVizinhos[i];
+			if(infoVizinhos[vizinho].novidade){
+				infoVizinhos[vizinho].novidade = 0;
+				if(infoVizinhos[vizinho].custo == INF){
+					printf("O vizinho %d está vivo\n", infoVizinhos[vizinho].id);
+					tabelaRoteamento[infoRoteador.id][vizinho].distancia = infoVizinhos[vizinho].custoOriginal;
+					tabelaRoteamento[infoRoteador.id][vizinho].proxSalto = vizinho;
+					infoVizinhos[vizinho].custo = infoVizinhos[vizinho].custoOriginal;
+				}
+			} else if(infoVizinhos[vizinho].custo != INF) {
+				printf("O vizinho %d está morto\n", infoVizinhos[vizinho].id);
+				infoVizinhos[vizinho].custo = INF;
+		        precisaRecalcular = 1;
+			}
+		}
+		if(precisaRecalcular){
+			recalcular(vizinho, tabelaRoteamento, infoVizinhos, infoRoteador);
+			enfileirarPacote(&saida, tabelaRoteamento, infoRoteador, listaVizinhos);
+		} 
+		pthread_mutex_unlock(&novidadeMutex);
 	}
 }

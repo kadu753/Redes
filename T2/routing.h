@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define REFRESH_TIME 2//Tempo entre os envios periodicos de vetor de distancia aos vizinhos
+#define TEMPO_CHECAR_REDE 2//Tempo entre os envios periodicos de vetor de distancia aos vizinhos
 #define TAM_FILA 1123456 //Tamanho máximo da fila =~ 1123456
 #define TAM_MENSAGEM 100 //Tamanho maximo da mensagem
 #define TAM_IP 30 //Tamanho máximo de um endereço
@@ -23,6 +23,7 @@ pthread_t threadEnviar;
 pthread_t threadReceber;
 pthread_t threadDesempacotar;
 pthread_t threadInformacao;
+pthread_t threadVivacidade;
 pthread_mutex_t logMutex;
 pthread_mutex_t mensagemMutex;
 pthread_mutex_t novidadeMutex;
@@ -33,6 +34,7 @@ FILE *logs, *messages;
 typedef struct{
   int id;
   int custoOriginal;
+  int saltoOriginal;
   int custo;
   int porta;
   int novidade;
@@ -95,11 +97,13 @@ void enfileirarPacote(filaPacotes_t *saida, distSalto_t tabelaRoteamento[N_ROTEA
                       informacoesRoteador_t infoRoteador, int listaVizinhos[N_ROTEADORES]);
 
 void printarArquivo(FILE *arquivo, pthread_mutex_t *mutex);
-void* enviar(void *nothing);
-void* desempacotador(void *nothing);
-void* receber(void *nothing);
-void* trocarInformacao(void *nothing);
+void* enviar(void *info);
+void* desempacotador(void *info);
+void* receber(void *info);
+void* trocarInformacao(void *info);
+void* checarVivacidade(void *info);
 void timeStamp();
+void recalcular(int vizinho, distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], roteadorVizinho_t infoVizinhos[N_ROTEADORES], informacoesRoteador_t infoRoteador);
 void duplicarPacote(pacote_t *original, pacote_t *copia);
 void printRoteamento(distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], FILE *arquivo);
 
