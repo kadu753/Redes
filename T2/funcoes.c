@@ -1,6 +1,5 @@
-#include "routing.h"
+#include "roteador.h"
 
-//Função com rotina de inicialização dos roteadores
 void inicializar(informacoesRoteador_t *infoRoteador,
                 roteadorVizinho_t infoVizinhos[N_ROTEADORES],
                 distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES],
@@ -13,7 +12,6 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   int i, j, auxLista;
   int id = infoRoteador->id;
 
-  //Inicializa o vetor de informações de vizinhos e a tabela de roteamento
   for(i = 0; i < N_ROTEADORES; i++){
     infoVizinhos[i].novidade = 0;
     infoVizinhos[i].id = infoVizinhos[i].porta = infoVizinhos[i].saltoOriginal = -1;
@@ -29,23 +27,18 @@ void inicializar(informacoesRoteador_t *infoRoteador,
   configurarEnlace(infoRoteador, listaVizinhos, infoVizinhos);
   configurarRoteadores(infoRoteador, infoVizinhos);
 
-  //Custo de um nó para ele mesmo é 0, via ele mesmo
   tabelaRoteamento[id][id].distancia = 0;
   tabelaRoteamento[id][id].proxSalto = id;
 
-  //Preenche o vetor de distâncias inicial do nó
   for(i = 0; i < infoRoteador->qtdVizinhos; i++){
     auxLista = listaVizinhos[i];
     tabelaRoteamento[id][auxLista].distancia = infoVizinhos[auxLista].custo;
     tabelaRoteamento[id][auxLista].proxSalto = infoVizinhos[auxLista].id;
   }
 
-  //Inicializa as filas de entrada e saida
   entrada->inicio = saida->inicio = entrada->fim = saida->fim = 0;
   pthread_mutex_init(&(entrada->mutex), NULL);
   pthread_mutex_init(&(saida->mutex), NULL);
-
-  //Inicializa mutex dos arquivos de log e mensagens e de checagem de queda de nó
   pthread_mutex_init(logMutex, NULL);
   pthread_mutex_init(mensagemMutex, NULL);
   pthread_mutex_init(novidadeMutex, NULL);
@@ -139,7 +132,6 @@ void recalcular(int vizinho, distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEAD
       }
     }
   }
-  printRoteamento(tabelaRoteamento, NULL);
 }
 
 void printRoteamento(distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES], FILE *arquivo){
@@ -231,13 +223,11 @@ void timeStamp(){
   fprintf(logs, "|%38s%12s", buf, "|\n");
 }
 
-//Funcao para imprimir mensagens de erro e encerrar o programa
 void die(char* msg){
   printf("%s\n", msg);
   exit(1);
 };
 
-//Funcao para converter uma string para inteiro
 int toint(char *str){
   int i, pot, ans;
   ans = 0;

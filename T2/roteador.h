@@ -1,5 +1,5 @@
-#ifndef ROUTING_H
-#define ROUTING_H
+#ifndef ROTEADOR_H
+#define ROTEADOR_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,11 +10,11 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define TEMPO_CHECAR_REDE 2//Tempo entre os envios periodicos de vetor de distancia aos vizinhos
-#define TAM_FILA 1123456 //Tamanho máximo da fila =~ 1123456
-#define TAM_MENSAGEM 100 //Tamanho maximo da mensagem
-#define TAM_IP 30 //Tamanho máximo de um endereço
-#define N_ROTEADORES 4 //Numero de Roteadores
+#define TEMPO_CHECAR_REDE 2
+#define TAM_FILA 12345678
+#define TAM_MENSAGEM 100
+#define TAM_IP 30
+#define N_ROTEADORES 4
 #define INF 12345678
 
 struct sockaddr_in socketRoteador;
@@ -30,7 +30,6 @@ pthread_mutex_t novidadeMutex;
 
 FILE *logs, *messages;
 
-//Estrutura de vizinho
 typedef struct{
   int id;
   int custoOriginal;
@@ -41,7 +40,6 @@ typedef struct{
   char ip[TAM_IP];
 } roteadorVizinho_t;
 
-//Estrutura de distância, para o vetor de distâncias
 typedef struct{
   int distancia;
   int proxSalto;
@@ -55,7 +53,6 @@ typedef struct{
   char ip[TAM_IP];
 }informacoesRoteador_t;
 
-//Estrutura de pacote
 typedef struct{
   int controle;
   int destino;
@@ -64,7 +61,6 @@ typedef struct{
   distSalto_t vetorDistancia[N_ROTEADORES];
 }pacote_t;
 
-//Fila de pacotes
 typedef struct{
   int inicio;
   int fim;

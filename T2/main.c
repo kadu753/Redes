@@ -1,4 +1,4 @@
-#include "routing.h"
+#include "roteador.h"
 
 roteadorVizinho_t infoVizinhos[N_ROTEADORES];
 distSalto_t tabelaRoteamento[N_ROTEADORES][N_ROTEADORES]; //Tabela de roteamento do nó
@@ -110,6 +110,7 @@ int main(int argc, char *argv[]){
 }
 
 void enviarMensagem(informacoesRoteador_t infoRoteador){
+	system("clear");
 	pacote_t auxPacote;
 	printf("Insira o roteador destino\n");
 	while(scanf("%d", &auxPacote.destino) != 1)			//Somente aceita um número inteiro
@@ -128,10 +129,10 @@ void enviarMensagem(informacoesRoteador_t infoRoteador){
 			if(strlen(auxPacote.mensagem) <= TAM_MENSAGEM){
 				auxPacote.controle = 0;
 				auxPacote.origem = infoRoteador.id;
+				printf("Pacote enviado para saida do roteador\n");
 				pthread_mutex_lock(&saida.mutex);
 				duplicarPacote(&auxPacote, &saida.filaPacotes[saida.fim++]);
 				pthread_mutex_unlock(&saida.mutex);
-				//printf("Mensagem enviada para o roteador #%d!\n", auxPacote.destino);
 				sleep(2);
 				break;
 			}else{
@@ -162,8 +163,9 @@ void* enviar(void *info){
 				pthread_mutex_unlock(&logMutex);
 			}else{
 				if(sendto(infoRoteador.sock, auxEnviar, sizeof(*auxEnviar), 0, (struct sockaddr*) &socketRoteador, slen) == -1){
+					printf("Falha ao enviar o seu pacote\n");
 					pthread_mutex_lock(&logMutex);
-					//fprintf(logs, "Enviar - Falha no envio do pacote\n");
+					fprintf(logs, "Enviar - Falha no envio do pacote\n");
 					pthread_mutex_unlock(&logMutex);
 				}else{
 					if(!auxEnviar->controle){
@@ -192,15 +194,15 @@ void* desempacotador(void *info){
 		pthread_mutex_lock(&entrada.mutex);
 		while(entrada.inicio != entrada.fim){
 			auxDesempacotar = &entrada.filaPacotes[entrada.inicio];
-			if(auxDesempacotar->destino == infoRoteador.id){ // O pacote é para mim
-				if(!auxDesempacotar->controle){ // Se for uma mensagem
+			if(auxDesempacotar->destino == infoRoteador.id){
+				if(!auxDesempacotar->controle){
 					pthread_mutex_lock(&logMutex);
 					fprintf(logs, "Desempacotando pacote de %d\n", auxDesempacotar->origem);
 					pthread_mutex_unlock(&logMutex);
 					pthread_mutex_lock(&mensagemMutex);
 					fprintf(messages, "Origem [%d]:  %s\n", auxDesempacotar->origem, auxDesempacotar->mensagem);
 					pthread_mutex_unlock(&mensagemMutex);
-				}else{ // É um pacote de controle
+				}else{
 					tabelaAtualizada = 0;
 					vetorAtualizado = 0;
 					pthread_mutex_lock(&novidadeMutex);
@@ -287,13 +289,11 @@ void *checarVivacidade(void *info){
 			if(infoVizinhos[vizinho].novidade){
 				infoVizinhos[vizinho].novidade = 0;
 				if(infoVizinhos[vizinho].custo == INF){
-					printf("O vizinho %d está vivo\n", infoVizinhos[vizinho].id);
 					tabelaRoteamento[infoRoteador.id][vizinho].distancia = infoVizinhos[vizinho].custoOriginal;
 					tabelaRoteamento[infoRoteador.id][vizinho].proxSalto = vizinho;
 					infoVizinhos[vizinho].custo = infoVizinhos[vizinho].custoOriginal;
 				}
 			} else if(infoVizinhos[vizinho].custo != INF) {
-				printf("O vizinho %d está morto\n", infoVizinhos[vizinho].id);
 				infoVizinhos[vizinho].custo = INF;
 		        precisaRecalcular = 1;
 			}
